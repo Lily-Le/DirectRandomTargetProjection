@@ -77,6 +77,9 @@ def setup(args):
     elif args.dataset == "CIFAR10":
         print("=== Loading the CIFAR-10 dataset...")
         (train_loader, traintest_loader, test_loader) = load_dataset_cifar10(args, kwargs)
+    elif args.dataset == "CIFAR100":
+        print("=== Loading the CIFAR-100 dataset...")
+        (train_loader, traintest_loader, test_loader) = load_dataset_cifar100(args, kwargs)   
     elif args.dataset == "CIFAR10aug":
         print("=== Loading and augmenting the CIFAR-10 dataset...")
         (train_loader, traintest_loader, test_loader) = load_dataset_cifar10_augmented(args, kwargs)
@@ -153,6 +156,21 @@ def load_dataset_cifar10(args, kwargs):
     args.label_features = 10
 
     return (train_loader, traintest_loader, test_loader)
+
+def load_dataset_cifar100(args, kwargs):
+    normalize = transforms.Normalize(mean=[x/255.0 for x in [125.3, 123.0, 113.9]], std=[x/255.0 for x in [63.0, 62.1, 66.7]])
+    transform_cifar100 = transforms.Compose([transforms.ToTensor(),normalize,])
+    
+    train_loader     = torch.utils.data.DataLoader(datasets.CIFAR100('./DATASETS', train=True,  download=True, transform=transform_cifar100), batch_size=args.batch_size,      shuffle=True , **kwargs)
+    traintest_loader = torch.utils.data.DataLoader(datasets.CIFAR100('./DATASETS', train=True,  download=True, transform=transform_cifar100), batch_size=args.test_batch_size, shuffle=False, **kwargs)
+    test_loader      = torch.utils.data.DataLoader(datasets.CIFAR100('./DATASETS', train=False, download=True, transform=transform_cifar100), batch_size=args.test_batch_size, shuffle=False, **kwargs)
+    
+    args.input_size     = 32
+    args.input_channels = 3
+    args.label_features = 100
+
+    return (train_loader, traintest_loader, test_loader)
+
 
 def load_dataset_cifar10_augmented(args, kwargs):
     #Source: https://zhenye-na.github.io/2018/09/28/pytorch-cnn-cifar10.html

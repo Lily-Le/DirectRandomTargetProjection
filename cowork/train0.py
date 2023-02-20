@@ -41,14 +41,8 @@ from tqdm import tqdm
 from tensorboardX import SummaryWriter
 import os
 
-# writer = SummaryWriter('logs')
+writer = SummaryWriter('logs')
 def train(args, device, train_loader, traintest_loader, test_loader):
-    # writer = SummaryWriter('logs/'+args.dataset+'/'+args.train_mode)
-    if args.freeze_conv_layers:
-        writer = SummaryWriter('logs/'+args.dataset+'/'+args.topology+'_random/'+args.train_mode+'/'+str(args.dropout))
-    else:
-        writer = SummaryWriter('logs/'+args.dataset+'/'+args.topology+'/'+args.train_mode+'/'+str(args.dropout))
-
     torch.manual_seed(42)
     
     for trial in range(1,args.trials+1):
@@ -105,8 +99,8 @@ def train(args, device, train_loader, traintest_loader, test_loader):
             
             # Compute accuracy on training and testing set
             print("\nSummary of epoch %d:" % (epoch))
-            test_epoch(args, model, device, traintest_loader, loss, 'Train', epoch, writer, trial)
-            test_epoch(args, model, device, test_loader, loss, 'Test', epoch, writer, trial)
+            test_epoch(args, model, device, traintest_loader, loss, 'Train', epoch)
+            test_epoch(args, model, device, test_loader, loss, 'Test', epoch)
 
 
 def train_epoch(args, model, device, train_loader, optimizer, loss):
@@ -135,7 +129,7 @@ def writefile(args, file):
     return filetestloss
 
 
-def test_epoch(args, model, device, test_loader, loss, phase, epoch, writer, trial):
+def test_epoch(args, model, device, test_loader, loss, phase, epoch):
     model.eval()
 
     test_loss, correct = 0, 0
@@ -159,23 +153,21 @@ def test_epoch(args, model, device, test_loader, loss, phase, epoch, writer, tri
         acc = 100. * correct / len_dataset
         print("\t[%5sing set] Loss: %6f, Accuracy: %6.2f%%" % (phase, loss, acc))
 
+
         filetestloss = writefile(args, '/testloss.txt')
         filetestacc = writefile(args, '/testacc.txt')
         filetrainloss = writefile(args, '/trainloss.txt')
         filetrainacc = writefile(args, '/trainacc.txt')
+
         if phase == 'Train':
+            writer.add_scalar('train_loss', loss, epoch)
+            writer.add_scalar('train_acc', acc, epoch)
             filetrainloss.write(str(epoch) + ' ' + str(loss) + '\n')
             filetrainacc.write(str(epoch) + ' ' + str(acc) + '\n')
         if phase == 'Test':
+            writer.add_scalar('test_loss', loss, epoch)
+            writer.add_scalar('test_acc', acc, epoch)
             filetestloss.write(str(epoch) + ' ' + str(loss) + '\n')
             filetestacc.write(str(epoch) + ' ' + str(acc) + '\n')
-
-        if trial == 1:
-            if phase == 'Train':
-                writer.add_scalar('train_loss', loss, epoch)
-                writer.add_scalar('train_acc', acc, epoch)
-            if phase == 'Test':
-                writer.add_scalar('test_loss', loss, epoch)
-                writer.add_scalar('test_acc', acc, epoch)
     else:
         print("\t[%5sing set] Loss: %6f" % (phase, loss))
