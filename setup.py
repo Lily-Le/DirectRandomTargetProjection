@@ -41,6 +41,9 @@ import os
 import sys
 import subprocess
 
+import os
+
+import torch
 
 class SynthDataset(torch.utils.data.Dataset):
 
@@ -64,7 +67,7 @@ def setup(args):
     else:
         device = torch.device('cpu')
     
-    kwargs = {'num_workers': 2, 'pin_memory': True} if args.cuda else {}
+    kwargs = {'num_workers': 2, 'pin_memory': True } if args.cuda else {}
     if args.dataset == "regression_synth":
         print("=== Loading the synthetic regression dataset...")
         (train_loader, traintest_loader, test_loader) = load_dataset_regression_synth(args, kwargs)
@@ -83,6 +86,9 @@ def setup(args):
     elif args.dataset == "CIFAR10aug":
         print("=== Loading and augmenting the CIFAR-10 dataset...")
         (train_loader, traintest_loader, test_loader) = load_dataset_cifar10_augmented(args, kwargs)
+    elif args.dataset == "IMAGENET":
+        print("=== Loading the IMAGENET dataset...")
+        (train_loader, traintest_loader, test_loader) = load_dataset_imagenet(args, kwargs)
     else:
         print("=== ERROR - Unsupported dataset ===")
         sys.exit(1)
@@ -199,3 +205,52 @@ def load_dataset_cifar10_augmented(args, kwargs):
     args.label_features = 10
 
     return (train_loader, traintest_loader, test_loader)
+
+
+def load_dataset_imagenet(args, kwargs):
+# Parameters for transformation: https://github.com/jiweibo/ImageNet/blob/master/data_loader.py
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
+    transform_train= transforms.Compose([
+            transforms.RandomResizedCrop(128),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            normalize
+        ])
+    transform_val= transforms.Compose([
+            transforms.Resize(128),
+            transforms.CenterCrop(112),
+            transforms.ToTensor(),
+            normalize
+        ])
+
+
+    # train_data = torchvision.datasets.ImageNet(root=args.data_path,split='train',transform=transform_train)
+    # train_loader = torch.utils.data.DataLoader(train_data,
+    #     batch_size=args.batch_size, shuffle=True,pin_memory=True,**kwargs)
+    train_data = torchvision.datasets.ImageFolder(os.path.join(args.data_path,'train'),transform=transform_train)
+    train_loader = torch.utils.data.DataLoader(train_data,batch_size=args.batch_size, shuffle=True,**kwargs)
+
+    # traintest_data = torchvision.datasets.ImageNet(root=args.data_path,split='train',transform=transform_val)
+    # traintest_loader = torch.utils.data.DataLoader(traintest_data,
+    #     batch_size=args.test_batch_size, pin_memory=True,shuffle=False, **kwargs)
+
+
+    traintest_data = torchvision.datasets.ImageFolder(os.path.join(args.data_path, 'train'), transform=transform_val)
+    traintest_loader =torch.utils.data.DataLoader(traintest_data,batch_size=args.test_batch_size,shuffle=False, **kwargs)
+
+    # test_data=torchvision.datasets.ImageNet(root=args.data_path,split='val',transform=transform_val)
+    # test_loader = torch.utils.data.DataLoader(test_data,
+    #     batch_size=args.test_batch_size, shuffle=False, pin_memory=True,**kwargs)
+
+    test_data=torchvision.datasets.ImageFolder(os.path.join(args.data_path, 'val'), transform=transform_val)
+    test_loader =torch.utils.data.DataLoader(test_data,batch_size=args.test_batch_size,shuffle=False,  **kwargs)
+
+    args.input_size = 224
+    args.input_channels = 3
+    args.label_features = 1000
+
+    return (train_loader, traintest_loader, test_loader)
+
+
+

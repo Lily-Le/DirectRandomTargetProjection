@@ -59,7 +59,7 @@ class NetworkBuilder(nn.Module):
         topology_layers = []
         num_layers = 0
         for elem in topology:
-            if not any(i.isdigit() for i in elem):
+            if not all(i.isdigit() for i in elem):
                 num_layers += 1
                 topology_layers.append([])
             topology_layers[num_layers-1].append(elem)
@@ -83,6 +83,40 @@ class NetworkBuilder(nn.Module):
                                        label_features=label_features,
                                        train_mode=train_mode
                                        ))
+                elif layer[0] == "CONV2":
+                    in_channels  = input_channels if (i==0) else out_channels
+                    out_channels = int(layer[1])
+                    input_dim    = input_size if (i==0) else int(output_dim/2) #/2 accounts for pooling operation of the previous convolutional layer
+                    output_dim   = int((input_dim - int(layer[2]) + 2*int(layer[4]))/int(layer[3]))+1
+                    self.layers.append(CNN_block_VGG2(
+                                       in_channels=in_channels,
+                                       out_channels=int(layer[1]),
+                                       kernel_size=int(layer[2]),
+                                       stride=int(layer[3]),
+                                       padding=int(layer[4]),
+                                       bias=True,
+                                       activation=conv_act,
+                                       dim_hook=[label_features,out_channels,output_dim,output_dim],
+                                       label_features=label_features,
+                                       train_mode=train_mode
+                                       ))                       
+                elif layer[0] == "CONV3":
+                    in_channels  = input_channels if (i==0) else out_channels
+                    out_channels = int(layer[1])
+                    input_dim    = input_size if (i==0) else int(output_dim/2) #/2 accounts for pooling operation of the previous convolutional layer
+                    output_dim   = int((input_dim - int(layer[2]) + 2*int(layer[4]))/int(layer[3]))+1
+                    self.layers.append(CNN_block_VGG3(
+                                       in_channels=in_channels,
+                                       out_channels=int(layer[1]),
+                                       kernel_size=int(layer[2]),
+                                       stride=int(layer[3]),
+                                       padding=int(layer[4]),
+                                       bias=True,
+                                       activation=conv_act,
+                                       dim_hook=[label_features,out_channels,output_dim,output_dim],
+                                       label_features=label_features,
+                                       train_mode=train_mode
+                                       ))                                                            
                 elif layer[0] == "FC":
                     if (i==0):
                         input_dim = pow(input_size,2)*input_channels 
@@ -105,6 +139,29 @@ class NetworkBuilder(nn.Module):
                                        fc_zero_init=fc_zero_init,
                                        train_mode=("BP" if (train_mode != "FA") else "FA") if output_layer else train_mode
                                        ))
+
+                elif layer[0] == "FCV": # FC for VGG
+                    if (i==0):
+                        input_dim = pow(input_size,2)*input_channels
+                        self.conv_to_fc = 0
+                    elif (topology_layers[i-1][0]=="CONV") or (topology_layers[i-1][0]=="CONV2") or (topology_layers[i-1][0]=="CONV3"):
+                        input_dim = pow(int(output_dim/2),2)*int(topology_layers[i-1][1]) #/2 accounts for pooling operation of the previous convolutional layer
+                        self.conv_to_fc = i
+                    else:
+                        input_dim = output_dim
+                    output_dim = int(layer[1])
+                    output_layer = (i == (num_layers-1))
+                    self.layers.append(FC_block_VGG(
+                                       in_features=input_dim,
+                                       out_features=output_dim,
+                                       bias=True,
+                                       activation=output_act if output_layer else hidden_act,
+                                       dropout=0 if output_layer else dropout, # 最后一层FC,不dropout
+                                       dim_hook=None if output_layer else [label_features,output_dim],
+                                       label_features=label_features,
+                                       fc_zero_init=fc_zero_init,
+                                       train_mode=("BP" if (train_mode != "FA") else "FA") if output_layer else train_mode
+                                       ))                               
                 else:
                     raise NameError("=== ERROR: layer construct " + str(elem) + " not supported")
             except ValueError as e:
@@ -167,6 +224,87 @@ class CNN_block(nn.Module):
         x = self.pool(x)
         return x
 
+class CNN_block_VGG2(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, stride, padding, bias, activation, dim_hook, label_features, train_mode):
+        super(CNN_block_VGG2, self).__init__()
+        
+        self.conv1 = nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size, stride=stride, padding=padding, bias=bias)
+        if train_mode == 'FA':
+            self.conv1 = FA_wrapper(module=self.conv1, layer_type='conv', dim=self.conv1.weight.shape, stride=stride, padding=padding)
+        self.act1 = Activation(activation)
+        
+        self.conv2 = nn.Conv2d(in_channels=out_channels, out_channels=out_channels, kernel_size=kernel_size, stride=stride, padding=padding, bias=bias)
+        if train_mode == 'FA':
+            self.conv2 = FA_wrapper(module=self.conv2, layer_type='conv', dim=self.conv2.weight.shape, stride=stride, padding=padding)
+        self.act2 = Activation(activation)
+        self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.hook = TrainingHook(label_features=label_features, dim_hook=dim_hook, train_mode=train_mode)
+
+    def forward(self, x, labels, y):
+        x = self.conv1(x)
+        x = self.act1(x)
+        x = self.conv2(x)
+        x = self.act2(x)
+        x = self.hook(x, labels, y)
+        x = self.pool(x)
+        return x   
+
+class CNN_block_VGG3(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, stride, padding, bias, activation, dim_hook, label_features, train_mode):
+        super(CNN_block_VGG3, self).__init__()
+        
+        self.conv1 = nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size, stride=stride, padding=padding, bias=bias)
+        if train_mode == 'FA':
+            self.conv1 = FA_wrapper(module=self.conv1, layer_type='conv', dim=self.conv1.weight.shape, stride=stride, padding=padding)
+        self.act1 = Activation(activation)
+        
+        self.conv2 = nn.Conv2d(in_channels=out_channels, out_channels=out_channels, kernel_size=kernel_size, stride=stride, padding=padding, bias=bias)
+        if train_mode == 'FA':
+            self.conv2 = FA_wrapper(module=self.conv2, layer_type='conv', dim=self.conv2.weight.shape, stride=stride, padding=padding)
+        self.act2 = Activation(activation)
+
+        self.conv3 = nn.Conv2d(in_channels=out_channels, out_channels=out_channels, kernel_size=kernel_size, stride=stride, padding=padding, bias=bias)
+        if train_mode == 'FA':
+            self.conv3 = FA_wrapper(module=self.conv3, layer_type='conv', dim=self.conv3.weight.shape, stride=stride, padding=padding)
+        self.act3 = Activation(activation)
+
+        self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.hook = TrainingHook(label_features=label_features, dim_hook=dim_hook, train_mode=train_mode)
+
+    def forward(self, x, labels, y):
+        x = self.conv1(x)
+        x = self.act1(x)
+        x = self.conv2(x)
+        x = self.act2(x)
+        x = self.conv3(x)
+        x = self.act3(x)
+
+        x = self.hook(x, labels, y)
+        x = self.pool(x)
+        return x   
+
+class FC_block_VGG(nn.Module): # First Linear+Act, then Dropout
+    def __init__(self, in_features, out_features, bias, activation, dropout, dim_hook, label_features, fc_zero_init, train_mode):
+        super(FC_block_VGG, self).__init__()
+        
+        self.dropout = dropout
+        self.fc = nn.Linear(in_features=in_features, out_features=out_features, bias=bias)
+        if fc_zero_init:
+            torch.zero_(self.fc.weight.data)
+        if train_mode == 'FA':
+            self.fc = FA_wrapper(module=self.fc, layer_type='fc', dim=self.fc.weight.shape)
+        self.act = Activation(activation)
+        if dropout != 0:
+            self.drop = nn.Dropout(p=dropout)
+        self.hook = TrainingHook(label_features=label_features, dim_hook=dim_hook, train_mode=train_mode)
+
+    def forward(self, x, labels, y):
+        x = self.fc(x)
+        x = self.act(x)
+        if self.dropout != 0:
+            x = self.drop(x)
+        x = self.hook(x, labels, y)
+        return x
 
 class Activation(nn.Module):
     def __init__(self, activation):
