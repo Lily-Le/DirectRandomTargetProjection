@@ -66,7 +66,9 @@ def setup(args):
         device = torch.cuda.current_device()
     else:
         device = torch.device('cpu')
-    
+    init_cuda= torch.cuda.memory_allocated(cuda_device)
+    print(f'init memory use = {init_cuda}')
+
     kwargs = {'num_workers': 2, 'pin_memory': True } if args.cuda else {}
     if args.dataset == "regression_synth":
         print("=== Loading the synthetic regression dataset...")
@@ -93,7 +95,9 @@ def setup(args):
         print("=== ERROR - Unsupported dataset ===")
         sys.exit(1)
     args.regression = (args.dataset == "regression_synth")
-    
+    aft_data= torch.cuda.memory_allocated(cuda_device)
+    print(f'After loading dataset {aft_data}')
+    print(f'Loading data uses {aft_data-init_cuda} memory')
     return (device, train_loader, traintest_loader, test_loader)
 
 def get_gpu_memory_usage():
@@ -212,17 +216,18 @@ def load_dataset_imagenet(args, kwargs):
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
     transform_train= transforms.Compose([
-            transforms.RandomResizedCrop(128),
+            transforms.RandomResizedCrop(224),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             normalize
         ])
     transform_val= transforms.Compose([
-            transforms.Resize(128),
-            transforms.CenterCrop(112),
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
             transforms.ToTensor(),
             normalize
         ])
+
 
 
     # train_data = torchvision.datasets.ImageNet(root=args.data_path,split='train',transform=transform_train)
@@ -236,7 +241,7 @@ def load_dataset_imagenet(args, kwargs):
     #     batch_size=args.test_batch_size, pin_memory=True,shuffle=False, **kwargs)
 
 
-    traintest_data = torchvision.datasets.ImageFolder(os.path.join(args.data_path, 'train'), transform=transform_val)
+    traintest_data = torchvision.datasets.ImageFolder(os.path.join(args.data_path, 'train'), transform=None)
     traintest_loader =torch.utils.data.DataLoader(traintest_data,batch_size=args.test_batch_size,shuffle=False, **kwargs)
 
     # test_data=torchvision.datasets.ImageNet(root=args.data_path,split='val',transform=transform_val)

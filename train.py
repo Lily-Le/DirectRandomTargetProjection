@@ -57,8 +57,10 @@ def train(args, device, train_loader, traintest_loader, test_loader):
         # print(list(model.named_parameters()))
 
         if args.cuda:
+            before_model=torch.cuda.memory_allocated(device)
             model.cuda()
-        
+            after_model=torch.cuda.memory_allocated(device)
+            print(f'Loading model uses {(after_model-before_model)/1024/1024} memory')
         if (args.trials > 1):  #Number of training trials
             print('\nIn trial {} of {}'.format(trial,args.trials))
         if (trial == 1):
