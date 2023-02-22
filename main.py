@@ -71,7 +71,7 @@ def main():
     # General
     parser.add_argument('--cpu', action='store_true', default=False, help='Disable CUDA and run on CPU.')
     # Dataset
-    parser.add_argument('--dataset', type=str, choices = ['regression_synth', 'classification_synth', 'MNIST', 'CIFAR10', 'CIFAR10aug', 'CIFAR100','IMAGENET'], default='IMAGENET', help='Choice of the dataset: synthetic regression (regression_synth), synthetic classification (classification_synth), MNIST (MNIST), CIFAR-10 (CIFAR10), CIFAR-10 with data augmentation (CIFAR10aug). Synthetic datasets must have been generated previously with synth_dataset_gen.py. Default: MNIST.')
+    parser.add_argument('--dataset', type=str, choices = ['regression_synth', 'classification_synth', 'MNIST', 'CIFAR10', 'CIFAR10aug', 'CIFAR100','IMAGENET'], default='CIFAR10', help='Choice of the dataset: synthetic regression (regression_synth), synthetic classification (classification_synth), MNIST (MNIST), CIFAR-10 (CIFAR10), CIFAR-10 with data augmentation (CIFAR10aug). Synthetic datasets must have been generated previously with synth_dataset_gen.py. Default: MNIST.')
     parser.add_argument('--data-path',type=str,default='/home/cll/work/data/classification/imagenet-mini',help='ImageNet Data Root Path')
     # Training
     parser.add_argument('--train-mode', choices = ['BP','FA','DFA','DRTP','sDFA','shallow'], default='DRTP', help='Choice of the training algorithm - backpropagation (BP), feedback alignment (FA), direct feedback alignment (DFA), direct random target propagation (DRTP), error-sign-based DFA (sDFA), shallow learning with all layers freezed but the last one that is BP-trained (shallow). Default: DRTP.')
@@ -82,7 +82,7 @@ def main():
     parser.add_argument('--dropout', type=float, default=0, help='Dropout probability (applied only to fully-connected layers). Default: 0.')
     parser.add_argument('--trials', type=int, default=1, help='Number of training trials Default: 1.')
     parser.add_argument('--epochs', type=int, default=500, help='Number of training epochs Default: 100.')
-    parser.add_argument('--batch-size', type=int, default=2, help='Input batch size for training. Default: 100.')
+    parser.add_argument('--batch-size', type=int, default=8, help='Input batch size for training. Default: 100.')
     parser.add_argument('--test-batch-size', type=int, default=8, help='Input batch size for testing Default: 1000.')
     parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate. Default: 1e-4.')
     # Network  #CONV_32_5_1_2_FC_1000_FC_100
