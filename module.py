@@ -89,6 +89,8 @@ class TrainingHook(nn.Module):
         
         # Feedback weights definition (FA feedback weights are handled in the FA_wrapper class)
         if self.train_mode in ["DFA", "DRTP", "sDFA"]:
+        #dim hook for CNN [label_features,out_channels,output_dim,output_dim],
+        #dim hook for FC [label_features,output_dim]
             self.fixed_fb_weights = nn.Parameter(torch.Tensor(torch.Size(dim_hook)))
             self.reset_weights()
         else:
@@ -99,6 +101,7 @@ class TrainingHook(nn.Module):
         self.fixed_fb_weights.requires_grad = False
 
     def forward(self, input, labels, y):
+        # print(torch.cuda.memory_summary())
         return trainingHook(input, labels, y, self.fixed_fb_weights, self.train_mode if (self.train_mode != "FA") else "BP") #FA is handled in FA_wrapper, not in TrainingHook
 
     def __repr__(self):
