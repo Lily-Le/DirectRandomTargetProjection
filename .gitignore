@@ -1,4 +1,6 @@
 output/*
 logs/*
+log_align/*
+output_align/*
 *.pyc
 DATASETS/*
