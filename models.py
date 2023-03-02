@@ -218,9 +218,9 @@ class CNN_block(nn.Module):
         self.hook = TrainingHook(label_features=label_features, dim_hook=dim_hook, train_mode=train_mode)
 
     def forward(self, x, labels, y):
-        x = self.conv(x)
-        x = self.act(x)
-        x = self.hook(x, labels, y)
+        x = self.conv(x) #batch*feature map size
+        x = self.act(x) #labels: 0/1 label for each channel, y: probability 
+        x = self.hook(x, labels, y) # y&label dim: batch*label_feature
         x = self.pool(x)
         return x
 

@@ -41,8 +41,10 @@ class HookFunction(Function):
     @staticmethod
     def forward(ctx, input, labels, y, fixed_fb_weights, train_mode):
         if train_mode in ["DFA", "sDFA", "DRTP"]:
-            ctx.save_for_backward(input, labels, y, fixed_fb_weights)
+            ctx.save_for_backward(labels, y, fixed_fb_weights)
+            # ctx.save_for_backward(input, labels, y, fixed_fb_weights)
         ctx.in1 = train_mode
+        torch.cuda.empty_cache()
         return input
 
     @staticmethod
@@ -54,16 +56,22 @@ class HookFunction(Function):
             grad_output.data.zero_()
             return grad_output, None, None, None, None
         
-        input, labels, y, fixed_fb_weights = ctx.saved_variables
+        # input, labels, y, fixed_fb_weights = ctx.saved_variables
+        labels, y, fixed_fb_weights = ctx.saved_variables
+
+        view_shape=grad_output.shape
         if train_mode == "DFA":
-            grad_output_est = (y-labels).mm(fixed_fb_weights.view(-1,prod(fixed_fb_weights.shape[1:]))).view(grad_output.shape)
+            # grad_output_est = (y-labels).mm(fixed_fb_weights.view(-1,prod(fixed_fb_weights.shape[1:]))).view(grad_output.shape)
+            grad_output = (y-labels).mm(fixed_fb_weights.view(-1,prod(fixed_fb_weights.shape[1:]))).view(view_shape)
+            print(f'dim y = {y.shape}\n dim labels={labels.shape} \n dim fixed_fb_weights={fixed_fb_weights.shape}')
         elif train_mode == "sDFA":
-            grad_output_est = torch.sign(y-labels).mm(fixed_fb_weights.view(-1,prod(fixed_fb_weights.shape[1:]))).view(grad_output.shape)
+            grad_output = torch.sign(y-labels).mm(fixed_fb_weights.view(-1,prod(fixed_fb_weights.shape[1:]))).view(view_shape)
         elif train_mode == "DRTP":
-            grad_output_est = labels.mm(fixed_fb_weights.view(-1,prod(fixed_fb_weights.shape[1:]))).view(grad_output.shape)
+            grad_output = labels.mm(fixed_fb_weights.view(-1,prod(fixed_fb_weights.shape[1:]))).view(view_shape)
         else:
             raise NameError("=== ERROR: training mode " + str(train_mode) + " not supported")
-
-        return grad_output_est, None, None, None, None
+        torch.cuda.empty_cache()
+        return grad_output, None, None, None, None
+        # return grad_output_est, None, None, None, None
 
 trainingHook = HookFunction.apply
