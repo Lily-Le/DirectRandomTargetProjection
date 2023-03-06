@@ -160,9 +160,9 @@ def load_dataset_cifar10(args, kwargs):
     normalize = transforms.Normalize(mean=[x/255.0 for x in [125.3, 123.0, 113.9]], std=[x/255.0 for x in [63.0, 62.1, 66.7]])
     transform_cifar10 = transforms.Compose([transforms.ToTensor(),normalize,])
     
-    train_loader     = torch.utils.data.DataLoader(datasets.CIFAR10('./DATASETS', train=True,  download=True, transform=transform_cifar10), batch_size=args.batch_size,      shuffle=True , **kwargs)
-    traintest_loader = torch.utils.data.DataLoader(datasets.CIFAR10('./DATASETS', train=True,  download=True, transform=transform_cifar10), batch_size=args.test_batch_size, shuffle=False, **kwargs)
-    test_loader      = torch.utils.data.DataLoader(datasets.CIFAR10('./DATASETS', train=False, download=True, transform=transform_cifar10), batch_size=args.test_batch_size, shuffle=False, **kwargs)
+    train_loader     = torch.utils.data.DataLoader(datasets.CIFAR10('./DATASETS', train=True,  download=True, transform=transform_cifar10), batch_size=args.batch_size,      shuffle=True , drop_last=True,**kwargs)
+    traintest_loader = torch.utils.data.DataLoader(datasets.CIFAR10('./DATASETS', train=True,  download=True, transform=transform_cifar10), batch_size=args.test_batch_size, shuffle=False, drop_last=True,**kwargs)
+    test_loader      = torch.utils.data.DataLoader(datasets.CIFAR10('./DATASETS', train=False, download=True, transform=transform_cifar10), batch_size=args.test_batch_size, shuffle=False, drop_last=True,**kwargs)
     
     args.input_size     = 32
     args.input_channels = 3
@@ -245,7 +245,7 @@ def load_dataset_imagenet(args, kwargs):
     #     batch_size=args.test_batch_size, pin_memory=True,shuffle=False, **kwargs)
 
 
-    traintest_data = torchvision.datasets.ImageFolder(os.path.join(args.data_path, 'train'), transform=None)
+    traintest_data = torchvision.datasets.ImageFolder(os.path.join(args.data_path, 'train'), transform=transform_val)
     traintest_loader =torch.utils.data.DataLoader(traintest_data,batch_size=args.test_batch_size,shuffle=False, **kwargs)
 
     # test_data=torchvision.datasets.ImageNet(root=args.data_path,split='val',transform=transform_val)
@@ -280,28 +280,15 @@ def load_dataset_imagenette(args, kwargs):
             normalize
         ])
 
-
-
-    # train_data = torchvision.datasets.ImageNet(root=args.data_path,split='train',transform=transform_train)
-    # train_loader = torch.utils.data.DataLoader(train_data,
-    #     batch_size=args.batch_size, shuffle=True,pin_memory=True,**kwargs)
     train_data = torchvision.datasets.ImageFolder(os.path.join(args.data_path,'train'),transform=transform_train)
-    train_loader = torch.utils.data.DataLoader(train_data,batch_size=args.batch_size, shuffle=True,**kwargs)
+    train_loader = torch.utils.data.DataLoader(train_data,batch_size=args.batch_size, shuffle=True,**kwargs,drop_last=True)
 
-    # traintest_data = torchvision.datasets.ImageNet(root=args.data_path,split='train',transform=transform_val)
-    # traintest_loader = torch.utils.data.DataLoader(traintest_data,
-    #     batch_size=args.test_batch_size, pin_memory=True,shuffle=False, **kwargs)
+    traintest_data = torchvision.datasets.ImageFolder(os.path.join(args.data_path, 'train'), transform=transform_val)
+    traintest_loader =torch.utils.data.DataLoader(traintest_data,batch_size=args.test_batch_size,shuffle=False,drop_last=True, **kwargs)
 
 
-    traintest_data = torchvision.datasets.ImageFolder(os.path.join(args.data_path, 'train'), transform=None)
-    traintest_loader =torch.utils.data.DataLoader(traintest_data,batch_size=args.test_batch_size,shuffle=False, **kwargs)
-
-    # test_data=torchvision.datasets.ImageNet(root=args.data_path,split='val',transform=transform_val)
-    # test_loader = torch.utils.data.DataLoader(test_data,
-    #     batch_size=args.test_batch_size, shuffle=False, pin_memory=True,**kwargs)
-
-    test_data=torchvision.datasets.ImageFolder(os.path.join(args.data_path, 'val'), transform=transform_val)
-    test_loader =torch.utils.data.DataLoader(test_data,batch_size=args.test_batch_size,shuffle=False,  **kwargs)
+    test_data=torchvision.datasets.ImageFolder(os.path.join(args.data_path, 'test'), transform=transform_val)
+    test_loader =torch.utils.data.DataLoader(test_data,batch_size=args.test_batch_size,shuffle=False,drop_last=True,  **kwargs)
 
     args.input_size = 224
     args.input_channels = 3

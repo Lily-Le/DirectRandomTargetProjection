@@ -40,7 +40,7 @@ limitations under the License.
 
 
 import argparse
-import train
+import train_0224 as train
 import setup
 import os
 
