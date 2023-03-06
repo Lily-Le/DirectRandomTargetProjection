@@ -92,6 +92,8 @@ def setup(args):
     elif args.dataset == "IMAGENET":
         print("=== Loading the IMAGENET dataset...")
         (train_loader, traintest_loader, test_loader) = load_dataset_imagenet(args, kwargs)
+    elif args.dataset == "IMAGENETTE":
+        (train_loader, traintest_loader, test_loader) = load_dataset_imagenette(args, kwargs)
     else:
         print("=== ERROR - Unsupported dataset ===")
         sys.exit(1)
@@ -158,9 +160,9 @@ def load_dataset_cifar10(args, kwargs):
     normalize = transforms.Normalize(mean=[x/255.0 for x in [125.3, 123.0, 113.9]], std=[x/255.0 for x in [63.0, 62.1, 66.7]])
     transform_cifar10 = transforms.Compose([transforms.ToTensor(),normalize,])
     
-    train_loader     = torch.utils.data.DataLoader(datasets.CIFAR10('./DATASETS', train=True,  download=True, transform=transform_cifar10), batch_size=args.batch_size,      shuffle=True , **kwargs)
-    traintest_loader = torch.utils.data.DataLoader(datasets.CIFAR10('./DATASETS', train=True,  download=True, transform=transform_cifar10), batch_size=args.test_batch_size, shuffle=False, **kwargs)
-    test_loader      = torch.utils.data.DataLoader(datasets.CIFAR10('./DATASETS', train=False, download=True, transform=transform_cifar10), batch_size=args.test_batch_size, shuffle=False, **kwargs)
+    train_loader     = torch.utils.data.DataLoader(datasets.CIFAR10('./DATASETS', train=True,  download=True, transform=transform_cifar10), batch_size=args.batch_size,      shuffle=True , drop_last=True,**kwargs)
+    traintest_loader = torch.utils.data.DataLoader(datasets.CIFAR10('./DATASETS', train=True,  download=True, transform=transform_cifar10), batch_size=args.test_batch_size, shuffle=False, drop_last=True,**kwargs)
+    test_loader      = torch.utils.data.DataLoader(datasets.CIFAR10('./DATASETS', train=False, download=True, transform=transform_cifar10), batch_size=args.test_batch_size, shuffle=False, drop_last=True,**kwargs)
     
     args.input_size     = 32
     args.input_channels = 3
@@ -243,7 +245,7 @@ def load_dataset_imagenet(args, kwargs):
     #     batch_size=args.test_batch_size, pin_memory=True,shuffle=False, **kwargs)
 
 
-    traintest_data = torchvision.datasets.ImageFolder(os.path.join(args.data_path, 'train'), transform=None)
+    traintest_data = torchvision.datasets.ImageFolder(os.path.join(args.data_path, 'train'), transform=transform_val)
     traintest_loader =torch.utils.data.DataLoader(traintest_data,batch_size=args.test_batch_size,shuffle=False, **kwargs)
 
     # test_data=torchvision.datasets.ImageNet(root=args.data_path,split='val',transform=transform_val)
@@ -261,3 +263,35 @@ def load_dataset_imagenet(args, kwargs):
 
 
 
+def load_dataset_imagenette(args, kwargs):
+# Parameters for transformation: https://github.com/jiweibo/ImageNet/blob/master/data_loader.py
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
+    transform_train= transforms.Compose([
+            transforms.RandomResizedCrop(224),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            normalize
+        ])
+    transform_val= transforms.Compose([
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            normalize
+        ])
+
+    train_data = torchvision.datasets.ImageFolder(os.path.join(args.data_path,'train'),transform=transform_train)
+    train_loader = torch.utils.data.DataLoader(train_data,batch_size=args.batch_size, shuffle=True,**kwargs,drop_last=True)
+
+    traintest_data = torchvision.datasets.ImageFolder(os.path.join(args.data_path, 'train'), transform=transform_val)
+    traintest_loader =torch.utils.data.DataLoader(traintest_data,batch_size=args.test_batch_size,shuffle=False,drop_last=True, **kwargs)
+
+
+    test_data=torchvision.datasets.ImageFolder(os.path.join(args.data_path, 'test'), transform=transform_val)
+    test_loader =torch.utils.data.DataLoader(test_data,batch_size=args.test_batch_size,shuffle=False,drop_last=True,  **kwargs)
+
+    args.input_size = 224
+    args.input_channels = 3
+    args.label_features = 10
+
+    return (train_loader, traintest_loader, test_loader)

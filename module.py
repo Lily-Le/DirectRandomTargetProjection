@@ -35,6 +35,7 @@ limitations under the License.
 import torch
 import torch.nn as nn
 from function import trainingHook
+import ipdb
 
 
 class FA_wrapper(nn.Module):
@@ -53,12 +54,19 @@ class FA_wrapper(nn.Module):
 
     def forward(self, x):
         if x.requires_grad:
+            # ipdb.set_trace()
             x.register_hook(self.FA_hook_pre)
             self.x_shape = x.shape
+            # ipdb.set_trace()
             x = self.module(x)
             x.register_hook(self.FA_hook_post)
+            # ipdb.set_trace()
+            # torch.cuda.empty_cache()
+            # ipdb.set_trace()
             return x
         else:
+            # ipdb.set_trace()
+            # torch.cuda.empty_cache()
             return self.module(x)
 
     def reset_weights(self):
@@ -67,17 +75,26 @@ class FA_wrapper(nn.Module):
     
     def FA_hook_pre(self, grad):
         if self.output_grad is not None:
+            # ipdb.set_trace()
+            # torch.cuda.empty_cache()
+            # ipdb.set_trace()
             if (self.layer_type == "fc"):
+                # ipdb.set_trace()
                 return self.output_grad.mm(self.fixed_fb_weights)
             elif (self.layer_type == "conv"):
+                # ipdb.set_trace()
                 return torch.nn.grad.conv2d_input(self.x_shape, self.fixed_fb_weights, self.output_grad, self.stride, self.padding)
             else:
                 raise NameError("=== ERROR: layer type " + str(self.layer_type) + " is not supported in FA wrapper")
         else:
+            # ipdb.set_trace()
             return grad
 
     def FA_hook_post(self, grad):
+        # ipdb.set_trace()
+        # torch.cuda.empty_cache()
         self.output_grad = grad
+        # ipdb.set_trace()
         return grad
 
 

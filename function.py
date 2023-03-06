@@ -36,6 +36,8 @@ limitations under the License.
 import torch
 from torch.autograd import Function
 from numpy import prod
+import pdb
+        
 
 class HookFunction(Function):
     @staticmethod
@@ -44,7 +46,7 @@ class HookFunction(Function):
             ctx.save_for_backward(labels, y, fixed_fb_weights)
             # ctx.save_for_backward(input, labels, y, fixed_fb_weights)
         ctx.in1 = train_mode
-        torch.cuda.empty_cache()
+        # torch.cuda.empty_cache()
         return input
 
     @staticmethod
@@ -63,14 +65,16 @@ class HookFunction(Function):
         if train_mode == "DFA":
             # grad_output_est = (y-labels).mm(fixed_fb_weights.view(-1,prod(fixed_fb_weights.shape[1:]))).view(grad_output.shape)
             grad_output = (y-labels).mm(fixed_fb_weights.view(-1,prod(fixed_fb_weights.shape[1:]))).view(view_shape)
-            print(f'dim y = {y.shape}\n dim labels={labels.shape} \n dim fixed_fb_weights={fixed_fb_weights.shape}')
+            # print(f'dim y = {y.shape}\n dim labels={labels.shape} \n dim fixed_fb_weights={fixed_fb_weights.shape}')
         elif train_mode == "sDFA":
             grad_output = torch.sign(y-labels).mm(fixed_fb_weights.view(-1,prod(fixed_fb_weights.shape[1:]))).view(view_shape)
         elif train_mode == "DRTP":
             grad_output = labels.mm(fixed_fb_weights.view(-1,prod(fixed_fb_weights.shape[1:]))).view(view_shape)
         else:
             raise NameError("=== ERROR: training mode " + str(train_mode) + " not supported")
+        # pdb.set_trace()
         torch.cuda.empty_cache()
+        # pdb.set_trace()
         return grad_output, None, None, None, None
         # return grad_output_est, None, None, None, None
 
