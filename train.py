@@ -43,6 +43,7 @@ from tqdm import tqdm
 from tensorboardX import SummaryWriter
 import os
 import sys
+from torchviz import make_dot, make_dot_from_trace
 
 # writer = SummaryWriter('logs')
 def train(args, device, train_loader, traintest_loader, test_loader):
@@ -57,7 +58,12 @@ def train(args, device, train_loader, traintest_loader, test_loader):
     for trial in range(1,args.trials+1):
         # Network topology
         model = models.NetworkBuilder(args.topology, input_size=args.input_size, input_channels=args.input_channels, label_features=args.label_features, train_batch_size=args.batch_size, train_mode=args.train_mode, dropout=args.dropout, conv_act=args.conv_act, hidden_act=args.hidden_act, output_act=args.output_act, fc_zero_init=args.fc_zero_init, loss=args.loss, device=device)
-
+        # input_shape=(args.batch_size,args.input_channels,args.input_size,args.input_size)
+        # # rand_input = torch.zeros(input_shape, requires_grad=True)
+        # rand_input=torch.rand(input_shape)
+        # rand_labels=torch.rand(args.batch_size,args.label_features)
+        # writer.add_graph(model,[rand_input,rand_labels])
+        
         tmp_=sys.stdout
         filepath = 'output/'+args.codename.split('-')[0]+'/'+args.codename
         ff = open(filepath+f'/model_summary_{args.input_size}.log','w')

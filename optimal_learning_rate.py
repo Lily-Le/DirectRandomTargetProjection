@@ -71,8 +71,8 @@ def GridSearch(args, device, train_loader, traintest_loader,  test_loader, param
         losses = []
         patience = args.patience
       
-        graph_inputs=torch.rand(args.batch_size,args.input_channels,args.input_size,args.input_size).type(torch.FloatTensor).cuda()
-        graph_labels=torch.rand(args.batch_size,args.label_features).type(torch.FloatTensor).cuda()
+        # graph_inputs=torch.rand(args.batch_size,args.input_channels,args.input_size,args.input_size).type(torch.FloatTensor).cuda()
+        # graph_labels=torch.rand(args.batch_size,args.label_features).type(torch.FloatTensor).cuda()
         # writer.add_graph(model,(graph_inputs,graph_labels))
 
         # writer.add_graph(model,input_to_model = torch.rand(args.batch_size,args.input_channels,args.input_size,args.input_size))
@@ -126,8 +126,8 @@ def main():
     parser.add_argument('--dropout', type=float, default=0, help='Dropout probability (applied only to fully-connected layers). Default: 0.')
     parser.add_argument('--trials', type=int, default=1, help='Number of training trials Default: 1.')
     parser.add_argument('--epochs', type=int, default=500, help='Number of training epochs Default: 100.')
-    parser.add_argument('--batch-size', type=int, default=256, help='Input batch size for training. Default: 100.')
-    parser.add_argument('--test-batch-size', type=int, default=256, help='Input batch size for testing Default: 1000.')
+    parser.add_argument('--batch-size', type=int, default=128, help='Input batch size for training. Default: 100.')
+    parser.add_argument('--test-batch-size', type=int, default=128, help='Input batch size for testing Default: 1000.')
     parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate. Default: 1e-4.')
     # Network  #CONV_32_1_2_FC_1000_FC_100
     parser.add_argument('--topology', type=str, default='CONV2_64_3_1_1_CONV2_128_3_1_1_CONV3_256_3_1_1_CONV3_512_3_1_1_CONV3_512_3_1_1_FCV_4096_FCV_4096_FCV_10', help='Choice of network topology. Format for convolutional layers: CONV_{output channels}_{kernel size}_{stride}_{padding}. Format for fully-connected layers: FC_{output units}.')
@@ -151,7 +151,7 @@ def main():
     (device, train_loader, traintest_loader, test_loader) = setup.setup(args)
     
     
-    param_grid = [1.5e-5, 5e-6]#[1.5e-3, 5e-4, 1.5e-4, 5e-5,  
+    param_grid = [1.5e-3, 5e-4, 1.5e-4, 5e-5, 1.5e-5,5e-6]
     # param_grid = [1.5e-6, 3e-7, 3e-8, 5e-7]# 
     # param_grid=args.param_grid
     # Create a GridSearchCV object to find the optimal learning rate

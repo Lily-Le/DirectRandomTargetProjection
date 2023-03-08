@@ -46,7 +46,7 @@ import os
 
 
 def filedel(filepath):
-    for i in ['/testloss.txt','/testacc.txt','/trainloss.txt','/trainacc.txt']:
+    for i in ['/testloss.txt','/testacc.txt','/trainloss.txt','/trainacc.txt','/testtime.txt','traintime.txt']:
         try:
             os.remove(filepath+i)
         except:
@@ -58,11 +58,12 @@ def mkd(args):
     except:
         pass
     try:
-        os.mkdir('output/' + args.codename.split('-')[0])
+        os.mkdir('output/' + args.codename.split('/')[0])
     except:
         pass
     try:
-        os.mkdir('output/' + args.codename.split('-')[0]+'/'+args.codename)
+        # os.mkdir('output/' + args.codename.split('/')[0]+'/'+args.codename)
+        os.makedirs('output/'+args.codename)
     except:
         pass
 
@@ -91,18 +92,25 @@ def main():
     parser.add_argument('--hidden-act', type=str, choices = {'tanh', 'sigmoid', 'relu'}, default='tanh', help='Type of activation for the fully-connected hidden layers - Tanh (tanh), Sigmoid (sigmoid), ReLU (relu). Default: tanh.')
     parser.add_argument('--output-act', type=str, choices = {'sigmoid', 'tanh', 'none'}, default='sigmoid', help='Type of activation for the network output layer - Sigmoid (sigmoid), Tanh (tanh), none (none). Default: sigmoid.')
     # parser.add_argument('--codename', type=str, default='test')
-    parser.add_argument('--cont', type=bool,default=True,help='"Choice the False if retrain from beginning')
-
+    parser.add_argument('--cont', type=bool,default=False,help='"Choice the False if retrain from beginning')
 
     args = parser.parse_args()
-    if args.freeze_conv_layers:
-        args.codename = args.dataset+'-'+args.topology+'-'+args.train_mode+'-'+str(args.dropout)+'-random'
+    VGG16_topo='CONV2_64_3_1_1_CONV2_128_3_1_1_CONV3_256_3_1_1_CONV3_512_3_1_1_CONV3_512_3_1_1_FCV_4096_FCV_4096_FCV_10'
+
+    if args.topology == VGG16_topo:
+        tpg_name='VGG16'
     else:
-        args.codename = args.dataset+'-'+args.topology+'-'+args.train_mode+'-'+str(args.dropout)
+        tpg_name=args.topology
+        
+    if args.freeze_conv_layers:
+        args.codename = args.dataset+'/'+tpg_name+'_random/'+args.train_mode+f'/bs{args.batch_size}'+'/'+str(args.dropout)
+    else:
+        # args.codename = args.dataset+'-'+args.topology+'-'+args.train_mode+'-'+str(args.dropout)
+        args.codename = args.dataset+'/'+tpg_name+'/'+args.train_mode+f'/bs{args.batch_size}'+f'/{args.dropout}'
 
 
     mkd(args)
-    filepath = 'output/'+args.codename.split('-')[0]+'/'+args.codename
+    filepath = 'output/'+args.codename
     file = open(filepath+'/para.txt','w')
     file.write('pid:'+str(os.getpid())+'\n')
     file.write(str(vars(args)).replace(',','\n'))

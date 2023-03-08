@@ -5,3 +5,9 @@ output_align/*
 *.pyc
 DATASETS/*
 events.*
+torchviz-sample
+attached
+.gitconfig
+.gitignore
+.vscode/*
+.idea/*
