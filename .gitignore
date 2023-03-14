@@ -2,6 +2,14 @@ output/*
 logs/*
 log_align/*
 output_align/*
+logs_lr_all/*
+output_lr_all/*
 *.pyc
 DATASETS/*
 events.*
+torchviz-sample
+attached
+.gitconfig
+.gitignore
+.vscode/*
+.idea/*

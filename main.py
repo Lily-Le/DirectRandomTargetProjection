@@ -46,7 +46,7 @@ import os
 
 
 def filedel(filepath):
-    for i in ['/testloss.txt','/testacc.txt','/trainloss.txt','/trainacc.txt']:
+    for i in ['/testloss.txt','/testacc.txt','/trainloss.txt','/trainacc.txt','/testtime.txt','traintime.txt']:
         try:
             os.remove(filepath+i)
         except:
@@ -58,11 +58,12 @@ def mkd(args):
     except:
         pass
     try:
-        os.mkdir('output/' + args.codename.split('-')[0])
+        os.mkdir('output/' + args.codename.split('/')[0])
     except:
         pass
     try:
-        os.mkdir('output/' + args.codename.split('-')[0]+'/'+args.codename)
+        # os.mkdir('output/' + args.codename.split('/')[0]+'/'+args.codename)
+        os.makedirs('output/'+args.codename)
     except:
         pass
 
@@ -80,10 +81,10 @@ def main():
     parser.add_argument('--freeze-conv-layers', action='store_true', default=False, help='Disable training of convolutional layers and keeps the weights at their initialized values.')
     parser.add_argument('--fc-zero-init', action='store_true', default=False, help='Initializes fully-connected weights to zero instead of the default He uniform initialization.')
     parser.add_argument('--dropout', type=float, default=0, help='Dropout probability (applied only to fully-connected layers). Default: 0.')
-    parser.add_argument('--trials', type=int, default=1, help='Number of training trials Default: 1.')
-    parser.add_argument('--epochs', type=int, default=500, help='Number of training epochs Default: 100.')
-    parser.add_argument('--batch-size', type=int, default=8, help='Input batch size for training. Default: 100.')
-    parser.add_argument('--test-batch-size', type=int, default=8, help='Input batch size for testing Default: 1000.')
+    parser.add_argument('--trials', type=int, default=10, help='Number of training trials Default: 1.')
+    parser.add_argument('--epochs', type=int, default=250, help='Number of training epochs Default: 100.')
+    parser.add_argument('--batch-size', type=int, default=128, help='Input batch size for training. Default: 100.')
+    parser.add_argument('--test-batch-size', type=int, default=128, help='Input batch size for testing Default: 1000.')
     parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate. Default: 1e-4.')
     # Network  #CONV_32_5_1_2_FC_1000_FC_100
     parser.add_argument('--topology', type=str, default='CONV2_64_3_1_1_CONV2_128_3_1_1_CONV3_256_3_1_1_CONV3_512_3_1_1_CONV3_512_3_1_1_FCV_4096_FCV_4096_FCV_10', help='Choice of network topology. Format for convolutional layers: CONV_{output channels}_{kernel size}_{stride}_{padding}. Format for fully-connected layers: FC_{output units}.')
@@ -91,18 +92,25 @@ def main():
     parser.add_argument('--hidden-act', type=str, choices = {'tanh', 'sigmoid', 'relu'}, default='tanh', help='Type of activation for the fully-connected hidden layers - Tanh (tanh), Sigmoid (sigmoid), ReLU (relu). Default: tanh.')
     parser.add_argument('--output-act', type=str, choices = {'sigmoid', 'tanh', 'none'}, default='sigmoid', help='Type of activation for the network output layer - Sigmoid (sigmoid), Tanh (tanh), none (none). Default: sigmoid.')
     # parser.add_argument('--codename', type=str, default='test')
-    parser.add_argument('--cont', type=bool,default=True,help='"Choice the False if retrain from beginning')
-
+    parser.add_argument('--cont', type=bool,default=False,help='"Choice the False if retrain from beginning')
 
     args = parser.parse_args()
-    if args.freeze_conv_layers:
-        args.codename = args.dataset+'-'+args.topology+'-'+args.train_mode+'-'+str(args.dropout)+'-random'
+    VGG16_topo='CONV2_64_3_1_1_CONV2_128_3_1_1_CONV3_256_3_1_1_CONV3_512_3_1_1_CONV3_512_3_1_1_FCV_4096_FCV_4096_FCV_10'
+
+    if args.topology == VGG16_topo:
+        tpg_name='VGG16'
     else:
-        args.codename = args.dataset+'-'+args.topology+'-'+args.train_mode+'-'+str(args.dropout)
+        tpg_name=args.topology
+        
+    if args.freeze_conv_layers:
+        args.codename = args.dataset+'/'+tpg_name+'_random/'+args.train_mode+f'/bs{args.batch_size}'+f'/{args.optimizer}'+'/'+str(args.dropout)
+    else:
+        # args.codename = args.dataset+'-'+args.topology+'-'+args.train_mode+'-'+str(args.dropout)
+        args.codename = args.dataset+'/'+tpg_name+'/'+args.train_mode+f'/bs{args.batch_size}'+f'/{args.optimizer}'+f'/{args.dropout}'
 
 
     mkd(args)
-    filepath = 'output/'+args.codename.split('-')[0]+'/'+args.codename
+    filepath = 'output/'+args.codename
     file = open(filepath+'/para.txt','w')
     file.write('pid:'+str(os.getpid())+'\n')
     file.write(str(vars(args)).replace(',','\n'))

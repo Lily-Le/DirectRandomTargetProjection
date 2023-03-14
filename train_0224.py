@@ -43,22 +43,33 @@ from tqdm import tqdm
 from tensorboardX import SummaryWriter
 import os
 import sys
+import time
+
+VGG16_topo='CONV2_64_3_1_1_CONV2_128_3_1_1_CONV3_256_3_1_1_CONV3_512_3_1_1_CONV3_512_3_1_1_FCV_4096_FCV_4096_FCV_10'
 # writer = SummaryWriter('logs')
 def train(args, device, train_loader, traintest_loader, test_loader):
     # writer = SummaryWriter('logs/'+args.dataset+'/'+args.train_mode)
-    if args.freeze_conv_layers:
-        writer = SummaryWriter('logs/'+args.dataset+'/'+args.topology+'_random/'+args.train_mode+'/'+str(args.dropout))
-    else:
-        writer = SummaryWriter('logs/'+args.dataset+'/'+args.topology+'/'+args.train_mode+'/'+str(args.dropout))
-
+    log_path='logs/'+args.codename
+        
+    # if args.freeze_conv_layers:
+    #     log_path='logs/'+args.codename
+    #     # writer = SummaryWriter('logs/'+args.dataset+'/'+tpg_name+'_random/'+args.train_mode+'/'+str(args.dropout))
+    # else:
+    #     log_path='logs/'+args.dataset+'/'+tpg_name+'/'+args.train_mode+f'/bs{args.batch_size}'+'/'+str(args.dropout)
+        
+    writer=SummaryWriter(log_path)
     torch.manual_seed(42)
-    
+    filepath = 'output/'+args.codename
+    # save_path=os.path.join(filepath,'checkpoints') #checkpoints
+    # if not os.path.exists(save_path):
+    #     os.mkdir(save_path)   
+        
     for trial in range(1,args.trials+1):
         # Network topology
         model = models.NetworkBuilder(args.topology, input_size=args.input_size, input_channels=args.input_channels, label_features=args.label_features, train_batch_size=args.batch_size, train_mode=args.train_mode, dropout=args.dropout, conv_act=args.conv_act, hidden_act=args.hidden_act, output_act=args.output_act, fc_zero_init=args.fc_zero_init, loss=args.loss, device=device)
         # print(list(model.named_parameters()))
         tmp_=sys.stdout
-        filepath = 'output/'+args.codename.split('-')[0]+'/'+args.codename
+        
         ff = open(filepath+f'/model_summary_{args.batch_size}.log','w')
         sys.stdout = ff
         model_info=torchinfo.summary(model,[(args.batch_size,args.input_channels,args.input_size,args.input_size),[args.label_features]])
@@ -71,6 +82,8 @@ def train(args, device, train_loader, traintest_loader, test_loader):
         sys.stdout = tmp_
         print(model_info)
         
+
+                 
         if args.cuda:
             model.cuda()
         
@@ -102,8 +115,13 @@ def train(args, device, train_loader, traintest_loader, test_loader):
         else:
             raise NameError("=== ERROR: loss " + str(args.loss) + " not supported")
 
-        if os.path.exists('./model.pth') and args.cont==True:
-            checkpoint = torch.load('./model.pth')
+
+        save_path=os.path.join(filepath,f'checkpoints/{trial}') #checkpoints
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)   
+    
+        if os.path.exists(save_path+'/latest.pth') and args.cont==True:
+            checkpoint = torch.load(save_path+'/latest.pth')
             model.load_state_dict(checkpoint['model'])
             optimizer.load_state_dict(checkpoint['optimizer'])
             start_epoch = checkpoint['epoch']
@@ -111,19 +129,38 @@ def train(args, device, train_loader, traintest_loader, test_loader):
         else:
             start_epoch = 1
             print('无保存模型，将从头开始训练！')
+            
+        print("\n\n=== Starting model training with %d epochs:\n" % (args.epochs,)) 
 
-        
-        print("\n\n=== Starting model training with %d epochs:\n" % (args.epochs,))        
         for epoch in range(start_epoch, args.epochs + 1):
             # Training
+            since=time.time()
             train_epoch(args, model, device, train_loader, optimizer, loss)
-            
+            time_elapsed = time.time() - since
             # Compute accuracy on training and testing set
             print("\nSummary of epoch %d:" % (epoch))
+            
+            filetraintime=writefile(args, '/traintime.txt')
+            filetraintime.write(str(epoch) + ' ' + str(time_elapsed) + '\n')
+            print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
+            
+         
             test_epoch(args, model, device, traintest_loader, loss, 'Train', epoch, writer, trial)
+            since=time.time()
             test_epoch(args, model, device, test_loader, loss, 'Test', epoch, writer, trial)
-
-
+            time_elapsed = time.time() - since
+            
+            filetesttime=writefile(args, '/testtime.txt')
+            filetesttime.write(str(epoch) + ' ' + str(time_elapsed) + '\n')
+            print('Testinging complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
+            # Save model
+            if ~(epoch % 20) and (epoch!=0):
+                torch.save({'model':model.state_dict(),'optimizer':optimizer.state_dict(),'epoch':epoch},os.path.join(save_path,f'latest.pth'))
+                # torch.save(model.state_dict(), os.path.join(save_path,f'latest.pth'))
+                print(f'Model saved! Epoch= {epoch}')
+        torch.save({'model':model.state_dict(),'optimizer':optimizer,'epoch':epoch}, os.path.join(save_path,f'latest.pth'))
+        print(f'Model saved! Epoch= {epoch}')
+        
 def train_epoch(args, model, device, train_loader, optimizer, loss):
     model.train()
     
@@ -145,7 +182,7 @@ def train_epoch(args, model, device, train_loader, optimizer, loss):
         optimizer.step()
 
 def writefile(args, file):
-    filepath = 'output/'+args.codename.split('-')[0]+'/'+args.codename
+    filepath = 'output/'+args.codename
     filetestloss = open(filepath + file, 'a')
     return filetestloss
 
