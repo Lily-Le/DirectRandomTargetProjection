@@ -81,10 +81,10 @@ def main():
     parser.add_argument('--freeze-conv-layers', action='store_true', default=False, help='Disable training of convolutional layers and keeps the weights at their initialized values.')
     parser.add_argument('--fc-zero-init', action='store_true', default=False, help='Initializes fully-connected weights to zero instead of the default He uniform initialization.')
     parser.add_argument('--dropout', type=float, default=0, help='Dropout probability (applied only to fully-connected layers). Default: 0.')
-    parser.add_argument('--trials', type=int, default=1, help='Number of training trials Default: 1.')
-    parser.add_argument('--epochs', type=int, default=500, help='Number of training epochs Default: 100.')
-    parser.add_argument('--batch-size', type=int, default=8, help='Input batch size for training. Default: 100.')
-    parser.add_argument('--test-batch-size', type=int, default=8, help='Input batch size for testing Default: 1000.')
+    parser.add_argument('--trials', type=int, default=10, help='Number of training trials Default: 1.')
+    parser.add_argument('--epochs', type=int, default=250, help='Number of training epochs Default: 100.')
+    parser.add_argument('--batch-size', type=int, default=128, help='Input batch size for training. Default: 100.')
+    parser.add_argument('--test-batch-size', type=int, default=128, help='Input batch size for testing Default: 1000.')
     parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate. Default: 1e-4.')
     # Network  #CONV_32_5_1_2_FC_1000_FC_100
     parser.add_argument('--topology', type=str, default='CONV2_64_3_1_1_CONV2_128_3_1_1_CONV3_256_3_1_1_CONV3_512_3_1_1_CONV3_512_3_1_1_FCV_4096_FCV_4096_FCV_10', help='Choice of network topology. Format for convolutional layers: CONV_{output channels}_{kernel size}_{stride}_{padding}. Format for fully-connected layers: FC_{output units}.')
@@ -103,10 +103,10 @@ def main():
         tpg_name=args.topology
         
     if args.freeze_conv_layers:
-        args.codename = args.dataset+'/'+tpg_name+'_random/'+args.train_mode+f'/bs{args.batch_size}'+'/'+str(args.dropout)
+        args.codename = args.dataset+'/'+tpg_name+'_random/'+args.train_mode+f'/bs{args.batch_size}'+f'/{args.optimizer}'+'/'+str(args.dropout)
     else:
         # args.codename = args.dataset+'-'+args.topology+'-'+args.train_mode+'-'+str(args.dropout)
-        args.codename = args.dataset+'/'+tpg_name+'/'+args.train_mode+f'/bs{args.batch_size}'+f'/{args.dropout}'
+        args.codename = args.dataset+'/'+tpg_name+'/'+args.train_mode+f'/bs{args.batch_size}'+f'/{args.optimizer}'+f'/{args.dropout}'
 
 
     mkd(args)

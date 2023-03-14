@@ -15,21 +15,31 @@ import sys
 # import torchsummary
 import torchinfo
 
+VGG16_topo='CONV2_64_3_1_1_CONV2_128_3_1_1_CONV3_256_3_1_1_CONV3_512_3_1_1_CONV3_512_3_1_1_FCV_4096_FCV_4096_FCV_10'
 def GridSearch(args, device, train_loader, traintest_loader,  test_loader, paramGrid):
     best_score = 0
     max_score = 0
+    if args.topology == VGG16_topo:
+        topology_name='VGG16'
+    else:
+        topology_name=args.topology
     for lr in paramGrid:
         if args.freeze_conv_layers:
-            writer = SummaryWriter('logs_lr_all/'+args.dataset+'/'+args.topology+'_random/'+args.train_mode+'/'+str(args.dropout)+'/'+str(args.batch_size)+'/'+str(lr))
+            filepath=args.dataset+'/'+topology_name+'_random/'+args.train_mode+'/'+str(args.dropout)+'/'+str(args.batch_size)+'/'+str(args.optimizer)+'/'+str(lr)
+            writer = SummaryWriter('logs_lr_all/'+filepath)
         else:
-            writer = SummaryWriter('logs_lr_all/'+args.dataset+'/'+args.topology+'/'+args.train_mode+'/'+str(args.dropout)+'/'+str(args.batch_size)+'/'+str(lr))
-
+            filepath=args.dataset+'/'+topology_name+'/'+args.train_mode+'/'+str(args.dropout)+'/'+str(args.batch_size)+'/'+str(args.optimizer)+'/'+str(lr)
+            writer = SummaryWriter('logs_lr_all/'+filepath)        
+        
+        save_path='output_lr_all/'+filepath+'/checkpoints'
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
         torch.manual_seed(42)
 
         model = models.NetworkBuilder(args.topology, input_size=args.input_size, input_channels=args.input_channels, label_features=args.label_features, train_batch_size=args.batch_size, train_mode=args.train_mode, dropout=args.dropout, conv_act=args.conv_act, hidden_act=args.hidden_act, output_act=args.output_act, fc_zero_init=args.fc_zero_init, loss=args.loss, device=device)
         tmp_=sys.stdout
-        filepath = 'logs_lr_all/'+args.dataset+'/'+args.topology+'/'+args.train_mode+'/'+str(args.dropout)+'/'+str(args.batch_size)
-        ff = open(filepath+f'/model_summary_{args.batch_size}.log','w')
+        # filepath = 'logs_lr_all/'+args.dataset+'/'+args.topology+'/'+args.train_mode+'/'+str(args.dropout)+'/'+str(args.batch_size)
+        ff = open('logs_lr_all/'+filepath+f'/model_summary_{args.batch_size}.log','w')
         sys.stdout = ff
         model_info=torchinfo.summary(model,[(args.batch_size,args.input_channels,args.input_size,args.input_size),[args.label_features]])
         print(args.topology)
@@ -95,7 +105,9 @@ def GridSearch(args, device, train_loader, traintest_loader,  test_loader, param
                     patience -= 1
                     if patience == 0:
                         break
-
+        
+        torch.save({'model':model.state_dict(),'optimizer':optimizer,'epoch':epoch}, os.path.join(save_path,f'{epoch}.pth'))
+        print(f'Model saved! Epoch= {epoch}')
         final_score = np.mean(scores[-10:])
         if final_score > best_score:
             optimal_learning_rate = lr 
@@ -135,7 +147,7 @@ def main():
     parser.add_argument('--hidden-act', type=str, choices = {'tanh', 'sigmoid', 'relu'}, default='tanh', help='Type of activation for the fully-connected hidden layers - Tanh (tanh), Sigmoid (sigmoid), ReLU (relu). Default: tanh.')
     parser.add_argument('--output-act', type=str, choices = {'sigmoid', 'tanh', 'none'}, default='sigmoid', help='Type of activation for the network output layer - Sigmoid (sigmoid), Tanh (tanh), none (none). Default: sigmoid.')
     # parser.add_argument('--codename', type=str, default='test')
-    parser.add_argument('--cont', type=bool,default=True,help='"Choice the False if retrain from beginning')
+    parser.add_argument('--cont', type=bool,default=False,help='"Choice the False if retrain from beginning')
     
     parser.add_argument('--tolerance', type=float, default=1e-4, help='Early stopping. Default: 1e-3.')
     parser.add_argument('--patience', type=float, default=50, help='Early stopping. Default:10.')
@@ -150,8 +162,9 @@ def main():
     # Generate dataset for classification
     (device, train_loader, traintest_loader, test_loader) = setup.setup(args)
     
-    
+    # param_grid = [5e-5, 1.5e-5,5e-6]    
     param_grid = [1.5e-3, 5e-4, 1.5e-4, 5e-5, 1.5e-5,5e-6]
+    param_grid=[1.5e-5,5e-6]
     # param_grid = [1.5e-6, 3e-7, 3e-8, 5e-7]# 
     # param_grid=args.param_grid
     # Create a GridSearchCV object to find the optimal learning rate
@@ -160,7 +173,7 @@ def main():
     # Print the optimal learning rate
     print("Optimal learning rate:", best_params)
 
-    filepath = 'output'
+    filepath = 'output_lr_all'
     file = open(filepath+f'/learning_rate_{args.batch_size}.txt','a+')
     if args.freeze_conv_layers:
         file.write(args.dataset+' '+args.topology+'_random '+args.train_mode+' '+str(args.dropout)+' '+str(best_params)+' '+str(best_params2)+'\n')

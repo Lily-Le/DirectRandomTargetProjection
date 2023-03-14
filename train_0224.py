@@ -60,9 +60,9 @@ def train(args, device, train_loader, traintest_loader, test_loader):
     writer=SummaryWriter(log_path)
     torch.manual_seed(42)
     filepath = 'output/'+args.codename
-    save_path=os.path.join(filepath,'checkpoints') #checkpoints
-    if not os.path.exists(save_path):
-        os.mkdir(save_path)   
+    # save_path=os.path.join(filepath,'checkpoints') #checkpoints
+    # if not os.path.exists(save_path):
+    #     os.mkdir(save_path)   
         
     for trial in range(1,args.trials+1):
         # Network topology
@@ -115,6 +115,11 @@ def train(args, device, train_loader, traintest_loader, test_loader):
         else:
             raise NameError("=== ERROR: loss " + str(args.loss) + " not supported")
 
+
+        save_path=os.path.join(filepath,f'checkpoints/{trial}') #checkpoints
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)   
+    
         if os.path.exists(save_path+'/latest.pth') and args.cont==True:
             checkpoint = torch.load(save_path+'/latest.pth')
             model.load_state_dict(checkpoint['model'])
