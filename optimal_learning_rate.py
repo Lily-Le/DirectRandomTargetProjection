@@ -5,15 +5,16 @@ import torch.optim as optim
 import torch.utils.data
 from tensorboardX import SummaryWriter
 
-
+import json
 import argparse
 import train_0224 as train
 import setup
 import os
-import models
+import models_SNN as models
 import sys
 # import torchsummary
 import torchinfo
+import time
 
 VGG16_topo='CONV2_64_3_1_1_CONV2_128_3_1_1_CONV3_256_3_1_1_CONV3_512_3_1_1_CONV3_512_3_1_1_FCV_4096_FCV_4096_FCV_10'
 def GridSearch(args, device, train_loader, traintest_loader,  test_loader, paramGrid):
@@ -31,9 +32,10 @@ def GridSearch(args, device, train_loader, traintest_loader,  test_loader, param
             filepath=args.dataset+'/'+topology_name+'/'+args.train_mode+'/'+str(args.dropout)+'/'+str(args.batch_size)+'/'+str(args.optimizer)+'/'+str(lr)
             writer = SummaryWriter('logs_lr_all/'+filepath)        
         
-        save_path='output_lr_all/'+filepath+'/checkpoints'
-        if not os.path.exists(save_path):
-            os.makedirs(save_path)
+        save_path='output_lr_all/'+filepath
+        checkpoint_path=save_path+'/checkpoints'
+        if not os.path.exists(checkpoint_path):
+            os.makedirs(checkpoint_path)
         torch.manual_seed(42)
 
         model = models.NetworkBuilder(args.topology, input_size=args.input_size, input_channels=args.input_channels, label_features=args.label_features, train_batch_size=args.batch_size, train_mode=args.train_mode, dropout=args.dropout, conv_act=args.conv_act, hidden_act=args.hidden_act, output_act=args.output_act, fc_zero_init=args.fc_zero_init, loss=args.loss, device=device)
@@ -86,13 +88,18 @@ def GridSearch(args, device, train_loader, traintest_loader,  test_loader, param
         # writer.add_graph(model,(graph_inputs,graph_labels))
 
         # writer.add_graph(model,input_to_model = torch.rand(args.batch_size,args.input_channels,args.input_size,args.input_size))
-
+        train_time_list=[]
+        test_time_list=[]
         for epoch in range(1, args.epochs + 1):
             # Training
+            since=time.time()
             train.train_epoch(args, model, device, train_loader, optimizer, loss)
+            train_time_list.append(time.time()-since)
             # epochloss = train.eval_epoch(args, model, device,  traintest_loader, loss, 'Train', epoch, writer)
             # Compute accuracy on testing set
+            since=time.time()
             epochloss, score = train.eval_epoch(args, model, device, test_loader, loss, 'Test', epoch, writer)
+            test_time_list.append(time.time()-since)
             losses.append(epochloss)
             scores.append(score)
             # early stopping
@@ -106,9 +113,13 @@ def GridSearch(args, device, train_loader, traintest_loader,  test_loader, param
                     if patience == 0:
                         break
         
-        torch.save({'model':model.state_dict(),'optimizer':optimizer,'epoch':epoch}, os.path.join(save_path,f'{epoch}.pth'))
+        torch.save({'model':model.state_dict(),'optimizer':optimizer,'epoch':epoch}, os.path.join(checkpoint_path,f'{epoch}.pth'))
         print(f'Model saved! Epoch= {epoch}')
         final_score = np.mean(scores[-10:])
+        
+        # Save training and testing time
+        write_json(train_time_list,save_path+'/train_time.json')
+        write_json(test_time_list,save_path+'/test_time.json')
         if final_score > best_score:
             optimal_learning_rate = lr 
             best_score = final_score
@@ -121,13 +132,19 @@ def GridSearch(args, device, train_loader, traintest_loader,  test_loader, param
     return optimal_learning_rate, optimal_learning_rate2
 
 
+def write_json(var_list,file_name):
+    with open(file_name, 'w', encoding='UTF-8') as fp:
+        fp.write(json.dumps(var_list, indent=2, ensure_ascii=False))
+    
+
+
 
 def main():
     parser = argparse.ArgumentParser(description='Training fully-connected and convolutional networks using backpropagation (BP), feedback alignment (FA), direct feedback alignment (DFA), and direct random target projection (DRTP)')
     # General
     parser.add_argument('--cpu', action='store_true', default=False, help='Disable CUDA and run on CPU.')
     # Dataset
-    parser.add_argument('--dataset', type=str, choices = ['regression_synth', 'classification_synth', 'MNIST', 'CIFAR10', 'CIFAR10aug', 'CIFAR100','IMAGENET','IMAGENETTE'], default='IMAGENETTE', help='Choice of the dataset: synthetic regression (regression_synth), synthetic classification (classification_synth), MNIST (MNIST), CIFAR-10 (CIFAR10), CIFAR-10 with data augmentation (CIFAR10aug). Synthetic datasets must have been generated previously with synth_dataset_gen.py. Default: MNIST.')
+    parser.add_argument('--dataset', type=str, choices = ['regression_synth', 'classification_synth', 'MNIST', 'CIFAR10', 'CIFAR10aug', 'CIFAR100','IMAGENET','IMAGENETTE'], default='MNIST', help='Choice of the dataset: synthetic regression (regression_synth), synthetic classification (classification_synth), MNIST (MNIST), CIFAR-10 (CIFAR10), CIFAR-10 with data augmentation (CIFAR10aug). Synthetic datasets must have been generated previously with synth_dataset_gen.py. Default: MNIST.')
     parser.add_argument('--data-path',type=str,default='/home/cll/Workspace/data/cls/imagenette/',help='ImageNet Data Root Path')
     # Training
     parser.add_argument('--train-mode', choices = ['BP','FA','DFA','DRTP','sDFA','shallow'], default='FA', help='Choice of the training algorithm - backpropagation (BP), feedback alignment (FA), direct feedback alignment (DFA), direct random target propagation (DRTP), error-sign-based DFA (sDFA), shallow learning with all layers freezed but the last one that is BP-trained (shallow). Default: DRTP.')
@@ -138,11 +155,11 @@ def main():
     parser.add_argument('--dropout', type=float, default=0, help='Dropout probability (applied only to fully-connected layers). Default: 0.')
     parser.add_argument('--trials', type=int, default=1, help='Number of training trials Default: 1.')
     parser.add_argument('--epochs', type=int, default=500, help='Number of training epochs Default: 100.')
-    parser.add_argument('--batch-size', type=int, default=128, help='Input batch size for training. Default: 100.')
-    parser.add_argument('--test-batch-size', type=int, default=128, help='Input batch size for testing Default: 1000.')
+    parser.add_argument('--batch-size', type=int, default=64, help='Input batch size for training. Default: 100.')
+    parser.add_argument('--test-batch-size', type=int, default=64, help='Input batch size for testing Default: 1000.')
     parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate. Default: 1e-4.')
     # Network  #CONV_32_1_2_FC_1000_FC_100
-    parser.add_argument('--topology', type=str, default='CONV2_64_3_1_1_CONV2_128_3_1_1_CONV3_256_3_1_1_CONV3_512_3_1_1_CONV3_512_3_1_1_FCV_4096_FCV_4096_FCV_10', help='Choice of network topology. Format for convolutional layers: CONV_{output channels}_{kernel size}_{stride}_{padding}. Format for fully-connected layers: FC_{output units}.')
+    parser.add_argument('--topology', type=str, default='CONVS_32_5_1_2_FCS_1000_FCS_10', help='Choice of network topology. Format for convolutional layers: CONV_{output channels}_{kernel size}_{stride}_{padding}. Format for fully-connected layers: FC_{output units}.')
     parser.add_argument('--conv-act', type=str, choices = {'tanh', 'sigmoid', 'relu'}, default='tanh', help='Type of activation for the convolutional layers - Tanh (tanh), Sigmoid (sigmoid), ReLU (relu). Default: tanh.')
     parser.add_argument('--hidden-act', type=str, choices = {'tanh', 'sigmoid', 'relu'}, default='tanh', help='Type of activation for the fully-connected hidden layers - Tanh (tanh), Sigmoid (sigmoid), ReLU (relu). Default: tanh.')
     parser.add_argument('--output-act', type=str, choices = {'sigmoid', 'tanh', 'none'}, default='sigmoid', help='Type of activation for the network output layer - Sigmoid (sigmoid), Tanh (tanh), none (none). Default: sigmoid.')
@@ -164,7 +181,7 @@ def main():
     
     # param_grid = [5e-5, 1.5e-5,5e-6]    
     param_grid = [1.5e-3, 5e-4, 1.5e-4, 5e-5, 1.5e-5,5e-6]
-    param_grid=[1.5e-5,5e-6]
+    # param_grid=[1.5e-5,5e-6]
     # param_grid = [1.5e-6, 3e-7, 3e-8, 5e-7]# 
     # param_grid=args.param_grid
     # Create a GridSearchCV object to find the optimal learning rate

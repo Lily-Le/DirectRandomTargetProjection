@@ -73,7 +73,7 @@ class HookFunction(Function):
         else:
             raise NameError("=== ERROR: training mode " + str(train_mode) + " not supported")
         # pdb.set_trace()
-        torch.cuda.empty_cache()
+        # torch.cuda.empty_cache()
         # pdb.set_trace()
         return grad_output, None, None, None, None
         # return grad_output_est, None, None, None, None
