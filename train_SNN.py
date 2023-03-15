@@ -38,9 +38,11 @@ import torch.optim as optim
 import torch.utils.data
 # import torchsummary
 import torchinfo
-import models
+# import models
+import models_SNN as models
 from tqdm import tqdm
 from tensorboardX import SummaryWriter
+from spikingjelly.clock_driven import neuron, encoding, functional
 import os
 import sys
 import time
@@ -68,19 +70,19 @@ def train(args, device, train_loader, traintest_loader, test_loader):
         # Network topology
         model = models.NetworkBuilder(args.topology, input_size=args.input_size, input_channels=args.input_channels, label_features=args.label_features, train_batch_size=args.batch_size, train_mode=args.train_mode, dropout=args.dropout, conv_act=args.conv_act, hidden_act=args.hidden_act, output_act=args.output_act, fc_zero_init=args.fc_zero_init, loss=args.loss, device=device)
         # print(list(model.named_parameters()))
-        tmp_=sys.stdout
+        # tmp_=sys.stdout
         
-        ff = open(filepath+f'/model_summary_{args.batch_size}.log','w')
-        sys.stdout = ff
-        model_info=torchinfo.summary(model,[(args.batch_size,args.input_channels,args.input_size,args.input_size),[args.label_features]])
-        print(args.topology)
-        print(args.dataset)
-        print(f'batch size {args.batch_size}')
-        print(model_info)
-        ff.close()
+        # ff = open(filepath+f'/model_summary_{args.batch_size}.log','w')
+        # sys.stdout = ff
+        # model_info=torchinfo.summary(model,[(args.batch_size,args.input_channels,args.input_size,args.input_size),[args.label_features]])
+        # print(args.topology)
+        # print(args.dataset)
+        # print(f'batch size {args.batch_size}')
+        # print(model_info)
+        # ff.close()
         
-        sys.stdout = tmp_
-        print(model_info)
+        # sys.stdout = tmp_
+        # print(model_info)
         
 
                  
@@ -183,6 +185,7 @@ def train_epoch(args, model, device, train_loader, optimizer, loss):
         loss_val = loss[0](output, loss[1](targets)) ###################
         loss_val.backward()
         optimizer.step()
+        functional.reset_net(model)
 
 def writefile(filepath, filename):
     if not os.path.exists(filepath):
@@ -198,7 +201,7 @@ def test_epoch(args, model, device, test_loader, loss, phase, epoch, writer, tri
     len_dataset = len(test_loader.dataset)
     
     with torch.no_grad():
-        for data, label in test_loader:
+        for batch_idx,(data, label) in enumerate(tqdm(test_loader)):
             data, label = data.to(device), label.to(device)
             if args.regression:
                 targets = label
@@ -210,6 +213,7 @@ def test_epoch(args, model, device, test_loader, loss, phase, epoch, writer, tri
             if not args.regression:
                 correct += pred.eq(label.view_as(pred)).sum().item()
     
+    functional.reset_net(model)
     loss = test_loss / len_dataset
     save_log_path='output/'+args.codename+f'/logs/{trial}'
     if not args.regression:
@@ -261,7 +265,7 @@ def eval_epoch(args, model, device, test_loader, loss, phase, epoch, writer):
     len_dataset = len(test_loader.dataset)
     
     with torch.no_grad():
-        for data, label in test_loader:
+        for batch_idx,(data, label) in enumerate(tqdm(test_loader)):
             data, label = data.to(device), label.to(device)
             if args.regression:
                 targets = label
@@ -272,7 +276,8 @@ def eval_epoch(args, model, device, test_loader, loss, phase, epoch, writer):
             pred = output.max(1, keepdim=True)[1]
             if not args.regression:
                 correct += pred.eq(label.view_as(pred)).sum().item()
-    
+                
+    functional.reset_net(model)
     loss = test_loss / len_dataset
     if not args.regression:
         acc = 100. * correct / len_dataset

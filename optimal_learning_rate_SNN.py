@@ -7,7 +7,7 @@ from tensorboardX import SummaryWriter
 
 import json
 import argparse
-import train_0224 as train
+import train_SNN as train
 import setup
 import os
 import models_SNN as models
