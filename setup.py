@@ -146,9 +146,9 @@ def load_dataset_classification_synth(args, kwargs):
     return (train_loader, traintest_loader, test_loader)
 
 def load_dataset_mnist(args, kwargs):
-    train_loader     = torch.utils.data.DataLoader(datasets.MNIST('./DATASETS', train=True,  download=True, transform=transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.0,),(1.0,))])), batch_size=args.batch_size,      shuffle=True , **kwargs)
-    traintest_loader = torch.utils.data.DataLoader(datasets.MNIST('./DATASETS', train=True,  download=True, transform=transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.0,),(1.0,))])), batch_size=args.test_batch_size, shuffle=False, **kwargs)
-    test_loader      = torch.utils.data.DataLoader(datasets.MNIST('./DATASETS', train=False, download=True, transform=transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.0,),(1.0,))])), batch_size=args.test_batch_size, shuffle=False, **kwargs)
+    train_loader     = torch.utils.data.DataLoader(datasets.MNIST('./DATASETS', train=True,  download=True, transform=transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.0,),(1.0,))])), batch_size=args.batch_size,      shuffle=True , drop_last=True,**kwargs)
+    traintest_loader = torch.utils.data.DataLoader(datasets.MNIST('./DATASETS', train=True,  download=True, transform=transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.0,),(1.0,))])), batch_size=args.test_batch_size, shuffle=False, drop_last=True,**kwargs)
+    test_loader      = torch.utils.data.DataLoader(datasets.MNIST('./DATASETS', train=False, download=True, transform=transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.0,),(1.0,))])), batch_size=args.test_batch_size, shuffle=False, drop_last=True,**kwargs)
     
     args.input_size     = 28
     args.input_channels = 1
