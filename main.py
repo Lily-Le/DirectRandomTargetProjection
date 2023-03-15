@@ -81,7 +81,7 @@ def main():
     parser.add_argument('--freeze-conv-layers', action='store_true', default=False, help='Disable training of convolutional layers and keeps the weights at their initialized values.')
     parser.add_argument('--fc-zero-init', action='store_true', default=False, help='Initializes fully-connected weights to zero instead of the default He uniform initialization.')
     parser.add_argument('--dropout', type=float, default=0, help='Dropout probability (applied only to fully-connected layers). Default: 0.')
-    parser.add_argument('--trials', type=int, default=10, help='Number of training trials Default: 1.')
+    parser.add_argument('--trials', type=int, default=7, help='Number of training trials Default: 1.')
     parser.add_argument('--epochs', type=int, default=250, help='Number of training epochs Default: 100.')
     parser.add_argument('--batch-size', type=int, default=128, help='Input batch size for training. Default: 100.')
     parser.add_argument('--test-batch-size', type=int, default=128, help='Input batch size for testing Default: 1000.')
@@ -93,6 +93,7 @@ def main():
     parser.add_argument('--output-act', type=str, choices = {'sigmoid', 'tanh', 'none'}, default='sigmoid', help='Type of activation for the network output layer - Sigmoid (sigmoid), Tanh (tanh), none (none). Default: sigmoid.')
     # parser.add_argument('--codename', type=str, default='test')
     parser.add_argument('--cont', type=bool,default=False,help='"Choice the False if retrain from beginning')
+    parser.add_argument('--start-trial', type=int,default=1,help='Starting trial')
 
     args = parser.parse_args()
     VGG16_topo='CONV2_64_3_1_1_CONV2_128_3_1_1_CONV3_256_3_1_1_CONV3_512_3_1_1_CONV3_512_3_1_1_FCV_4096_FCV_4096_FCV_10'

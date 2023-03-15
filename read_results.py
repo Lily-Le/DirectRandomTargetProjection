@@ -57,7 +57,8 @@ else:
     codename = dataset+'-'+topology+'-'+train_mode+'-'+str(dropout)
 
 #%%
-filepath = '/home/cll/Workspace/code/DirectRandomTargetProjection/output/IMAGENETTE/VGG16/DFA/bs128/Adam/0.1'
+filepath = '/home/cll/Workspace/code/DirectRandomTargetProjection/output/IMAGENETTE/VGG16/DRTP/bs128/Adam/0.1'
+filepath = '/home/cll/Workspace/code/DirectRandomTargetProjection/output/IMAGENETTE/IMAGENETTE-CONV2_64_3_1_1_CONV2_128_3_1_1_CONV3_256_3_1_1_CONV3_512_3_1_1_CONV3_512_3_1_1_FCV_4096_FCV_4096_FCV_10-DRTP-0.0'
 file = open(filepath+'/testacc.txt')
 lines = file.readlines()
 err = []
@@ -84,9 +85,8 @@ for n in trial_list:
 
 selected_data=np.array([n[-10:] for n in trial_list]).flatten()
 
-#%%
-mean = np.mean(selected_data)
-std = np.std(selected_data)
+mean = np.mean(100-selected_data)
+std = np.std(100-selected_data)
 
 print("Mean error:", mean)
 print("Standard Deviation of error:", std)

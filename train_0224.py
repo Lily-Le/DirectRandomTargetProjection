@@ -64,7 +64,7 @@ def train(args, device, train_loader, traintest_loader, test_loader):
     # if not os.path.exists(save_path):
     #     os.mkdir(save_path)   
         
-    for trial in range(1,args.trials+1):
+    for trial in range(args.start_trial,args.trials+args.start_trial):
         # Network topology
         model = models.NetworkBuilder(args.topology, input_size=args.input_size, input_channels=args.input_channels, label_features=args.label_features, train_batch_size=args.batch_size, train_mode=args.train_mode, dropout=args.dropout, conv_act=args.conv_act, hidden_act=args.hidden_act, output_act=args.output_act, fc_zero_init=args.fc_zero_init, loss=args.loss, device=device)
         # print(list(model.named_parameters()))
@@ -117,9 +117,12 @@ def train(args, device, train_loader, traintest_loader, test_loader):
 
 
         save_path=os.path.join(filepath,f'checkpoints/{trial}') #checkpoints
+        save_log_path=os.path.join(filepath,f'logs/{trial}')
         if not os.path.exists(save_path):
             os.makedirs(save_path)   
-    
+        if not os.path.exists(save_log_path):
+            os.makedirs(save_log_path)  
+            
         if os.path.exists(save_path+'/latest.pth') and args.cont==True:
             checkpoint = torch.load(save_path+'/latest.pth')
             model.load_state_dict(checkpoint['model'])
@@ -140,7 +143,7 @@ def train(args, device, train_loader, traintest_loader, test_loader):
             # Compute accuracy on training and testing set
             print("\nSummary of epoch %d:" % (epoch))
             
-            filetraintime=writefile(args, '/traintime.txt')
+            filetraintime=writefile(save_log_path, f'/traintime.txt')
             filetraintime.write(str(epoch) + ' ' + str(time_elapsed) + '\n')
             print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
             
@@ -150,7 +153,7 @@ def train(args, device, train_loader, traintest_loader, test_loader):
             test_epoch(args, model, device, test_loader, loss, 'Test', epoch, writer, trial)
             time_elapsed = time.time() - since
             
-            filetesttime=writefile(args, '/testtime.txt')
+            filetesttime=writefile(save_log_path, f'/testtime.txt')
             filetesttime.write(str(epoch) + ' ' + str(time_elapsed) + '\n')
             print('Testinging complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
             # Save model
@@ -181,9 +184,10 @@ def train_epoch(args, model, device, train_loader, optimizer, loss):
         loss_val.backward()
         optimizer.step()
 
-def writefile(args, file):
-    filepath = 'output/'+args.codename
-    filetestloss = open(filepath + file, 'a')
+def writefile(filepath, filename):
+    if not os.path.exists(filepath):
+        os.makedirs(filepath)
+    filetestloss = open(filepath+filename , 'a')
     return filetestloss
 
 
@@ -207,14 +211,15 @@ def test_epoch(args, model, device, test_loader, loss, phase, epoch, writer, tri
                 correct += pred.eq(label.view_as(pred)).sum().item()
     
     loss = test_loss / len_dataset
+    save_log_path='output/'+args.codename+f'/logs/{trial}'
     if not args.regression:
         acc = 100. * correct / len_dataset
         print("\t[%5sing set] Loss: %6f, Accuracy: %6.2f%%" % (phase, loss, acc))
-
-        filetestloss = writefile(args, '/testloss.txt')
-        filetestacc = writefile(args, '/testacc.txt')
-        filetrainloss = writefile(args, '/trainloss.txt')
-        filetrainacc = writefile(args, '/trainacc.txt')
+        
+        filetestloss = writefile(save_log_path, f'/testloss.txt')
+        filetestacc = writefile(save_log_path, f'/testacc.txt')
+        filetrainloss = writefile(save_log_path, f'/trainloss.txt')
+        filetrainacc = writefile(save_log_path, f'/trainacc.txt')
 
         if trial == 1:
             if phase == 'Train':
@@ -233,8 +238,8 @@ def test_epoch(args, model, device, test_loader, loss, phase, epoch, writer, tri
 
     else:
         print("\t[%5sing set] Loss: %6f" % (phase, loss))
-        filetestloss = writefile(args, '/testloss.txt')
-        filetrainloss = writefile(args, '/trainloss.txt')
+        filetestloss = writefile(save_log_path, f'/testloss.txt')
+        filetrainloss = writefile(save_log_path, f'/trainloss.txt')
 
         if trial == 1:
             if phase == 'Train':
