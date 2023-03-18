@@ -15,22 +15,24 @@ import sys
 # import torchsummary
 import torchinfo
 import time
+import pdb
+from spikingjelly.clock_driven import neuron, encoding, functional, surrogate, layer
 
-VGG16_topo='CONV2_64_3_1_1_CONV2_128_3_1_1_CONV3_256_3_1_1_CONV3_512_3_1_1_CONV3_512_3_1_1_FCV_4096_FCV_4096_FCV_10'
+VGG16S_topo='CONV2S_64_3_1_1_CONV2S_128_3_1_1_CONV3S_256_3_1_1_CONV3S_512_3_1_1_CONV3S_512_3_1_1_FCV_4096_FCVS_4096_FCVS_10'
 def GridSearch(args, device, train_loader, traintest_loader,  test_loader, paramGrid):
     best_score = 0
     max_score = 0
-    if args.topology == VGG16_topo:
-        topology_name='VGG16'
+    if args.topology == VGG16S_topo:
+        topology_name='VGG16S'
     else:
         topology_name=args.topology
     for lr in paramGrid:
         if args.freeze_conv_layers:
-            filepath=args.dataset+'/'+topology_name+'_random/'+args.train_mode+'/'+str(args.dropout)+'/'+str(args.batch_size)+'/'+str(args.optimizer)+f'/T{args.spike_window}'+'/'+str(lr)
+            filepath=args.dataset+'/'+topology_name+'_random'+f'/{args.loss}'+f'/{args.surrogate}/'+args.train_mode+'/'+str(args.dropout)+'/'+str(args.batch_size)+'/'+str(args.optimizer)+f'/T{args.spike_window}'+f'/tau{args.tau}'+'/'+str(lr)
             writer = SummaryWriter('logs_lr_all/'+filepath)
         else:
-            filepath=args.dataset+'/'+topology_name+'/'+args.train_mode+'/'+str(args.dropout)+'/'+str(args.batch_size)+'/'+str(args.optimizer)+f'/T{args.spike_window}'+'/'+str(lr)
-            writer = SummaryWriter('logs_lr_all/'+filepath)        
+            filepath=args.dataset+'/'+topology_name+f'/{args.loss}'+f'/{args.surrogate}'+'/'+args.train_mode+'/'+str(args.dropout)+'/'+str(args.batch_size)+'/'+str(args.optimizer)+f'/T{args.spike_window}'+f'/tau{args.tau}'+'/'+str(lr)
+            writer = SummaryWriter('logs_lr_all/'+filepath)         
         
         save_path='output_lr_all/'+filepath
         checkpoint_path=save_path+'/checkpoints'
@@ -38,7 +40,7 @@ def GridSearch(args, device, train_loader, traintest_loader,  test_loader, param
             os.makedirs(checkpoint_path)
         torch.manual_seed(42)
 
-        model = models.NetworkBuilder(args.topology, input_size=args.input_size, input_channels=args.input_channels, label_features=args.label_features, train_batch_size=args.batch_size, train_mode=args.train_mode, dropout=args.dropout, conv_act=args.conv_act, hidden_act=args.hidden_act, output_act=args.output_act, fc_zero_init=args.fc_zero_init, loss=args.loss, device=device,spike_window=args.spike_window)
+        model = models.NetworkBuilder(args.topology, input_size=args.input_size, input_channels=args.input_channels, label_features=args.label_features, train_batch_size=args.batch_size, train_mode=args.train_mode, dropout=args.dropout, conv_act=args.conv_act, hidden_act=args.hidden_act, output_act=args.output_act, fc_zero_init=args.fc_zero_init, loss=args.loss, device=device,tau=args.tau,spike_window=args.spike_window,surrogate_=args.surrogate)
         tmp_=sys.stdout
         # filepath = 'logs_lr_all/'+args.dataset+'/'+args.topology+'/'+args.train_mode+'/'+str(args.dropout)+'/'+str(args.batch_size)
         ff = open('logs_lr_all/'+filepath+f'/model_summary_{args.batch_size}.log','w')
@@ -86,11 +88,43 @@ def GridSearch(args, device, train_loader, traintest_loader,  test_loader, param
         # graph_inputs=torch.rand(args.batch_size,args.input_channels,args.input_size,args.input_size).type(torch.FloatTensor).cuda()
         # graph_labels=torch.rand(args.batch_size,args.label_features).type(torch.FloatTensor).cuda()
         # writer.add_graph(model,(graph_inputs,graph_labels))
+        # pdb.set_trace()
+        if (args.cont!=0) and os.path.exists(checkpoint_path+f'/{args.cont}.pth') :
+
+            checkpoint = torch.load(checkpoint_path+f'/{args.cont}.pth')
+            model.load_state_dict(checkpoint['model'])
+            try:
+                # pdb.set_trace()
+                optimizer.load_state_dict(checkpoint['optimizer'])
+                print('load optimizer state dict')
+            except:
+                # pdb.set_trace()
+                keys_=[*checkpoint['optimizer']['state']]
+                for i in range(int(len(keys_)/2)):
+                    n1=keys_[i]
+                    n2=keys_[i+32]
+                    # pdb.set_trace()
+                    optimizer.state_dict()['state'][n1]=checkpoint['optimizer']['state'][n2]
+                # for n in optimizer.state_dict()['param_groups'][0]['params']:
+                #     optimizer.state_dict()['state'][n]=checkpoint['optimizer']['state'][n+32]
+                # optimizer.add_param_group({'params':model.parameters()})
+                # optimizer.load_state_dict(checkpoint['optimizer'])
+                # print('load optimizer')
+            # optimizer.load_state_dict(checkpoint["optimizer"].state_dict())
+            # del optimizer_tmp
+            start_epoch = checkpoint['epoch']
+            print('加载 epoch {} 成功！'.format(start_epoch))
+            args.cont=0
+        else:
+            start_epoch = 1
+            print('无保存模型，将从头开始训练！')
+            
+        print("\n\n=== Starting model training with %d epochs:\n" % (args.epochs,)) 
 
         # writer.add_graph(model,input_to_model = torch.rand(args.batch_size,args.input_channels,args.input_size,args.input_size))
         train_time_list=[]
         test_time_list=[]
-        for epoch in range(1, args.epochs + 1):
+        for epoch in range(start_epoch, args.epochs + 1):
             # Training
             since=time.time()
             train.train_epoch(args, model, device, train_loader, optimizer, loss)
@@ -103,17 +137,21 @@ def GridSearch(args, device, train_loader, traintest_loader,  test_loader, param
             losses.append(epochloss)
             scores.append(score)
             # early stopping
-            if epoch > 1:
-                lossDecrement = (losses[epoch-2]-epochloss)/losses[epoch-2]
-                print(losses[epoch-2])
+            if (epoch > 1) and (len(losses)>4):
+                lossDecrement = (losses[epoch-start_epoch-2]-epochloss)/losses[epoch-start_epoch-2]
+                print(losses[epoch-start_epoch-2])
                 print(epochloss)
                 print(lossDecrement)
                 if lossDecrement < args.tolerance:
                     patience -= 1
                     if patience == 0:
                         break
+            if (epoch % args.ckpt_interval)==0 and (epoch!=0):
+                torch.save({'model':model.state_dict(),'optimizer':optimizer.state_dict(),'epoch':epoch},os.path.join(checkpoint_path,f'{epoch}.pth'))
+                # torch.save(model.state_dict(), os.path.join(save_path,f'latest.pth'))
+                print(f'Model saved! Epoch= {epoch}')
         
-        torch.save({'model':model.state_dict(),'optimizer':optimizer,'epoch':epoch}, os.path.join(checkpoint_path,f'{epoch}.pth'))
+        torch.save({'model':model.state_dict(),'optimizer':optimizer.state_dict(),'epoch':epoch}, os.path.join(checkpoint_path,f'{epoch}.pth'))
         print(f'Model saved! Epoch= {epoch}')
         final_score = np.mean(scores[-10:])
         
@@ -144,7 +182,7 @@ def main():
     # General
     parser.add_argument('--cpu', action='store_true', default=False, help='Disable CUDA and run on CPU.')
     # Dataset
-    parser.add_argument('--dataset', type=str, choices = ['regression_synth', 'classification_synth', 'MNIST', 'CIFAR10', 'CIFAR10aug', 'CIFAR100','IMAGENET','IMAGENETTE'], default='MNIST', help='Choice of the dataset: synthetic regression (regression_synth), synthetic classification (classification_synth), MNIST (MNIST), CIFAR-10 (CIFAR10), CIFAR-10 with data augmentation (CIFAR10aug). Synthetic datasets must have been generated previously with synth_dataset_gen.py. Default: MNIST.')
+    parser.add_argument('--dataset', type=str, choices = ['regression_synth', 'classification_synth', 'MNIST', 'CIFAR10', 'CIFAR10aug', 'CIFAR100','IMAGENET','IMAGENETTE'], default='CIFAR10', help='Choice of the dataset: synthetic regression (regression_synth), synthetic classification (classification_synth), MNIST (MNIST), CIFAR-10 (CIFAR10), CIFAR-10 with data augmentation (CIFAR10aug). Synthetic datasets must have been generated previously with synth_dataset_gen.py. Default: MNIST.')
     parser.add_argument('--data-path',type=str,default='/home/cll/Workspace/data/cls/imagenette/',help='ImageNet Data Root Path')
     # Training
     parser.add_argument('--train-mode', choices = ['BP','FA','DFA','DRTP','sDFA','shallow'], default='FA', help='Choice of the training algorithm - backpropagation (BP), feedback alignment (FA), direct feedback alignment (DFA), direct random target propagation (DRTP), error-sign-based DFA (sDFA), shallow learning with all layers freezed but the last one that is BP-trained (shallow). Default: DRTP.')
@@ -159,19 +197,24 @@ def main():
     parser.add_argument('--test-batch-size', type=int, default=64, help='Input batch size for testing Default: 1000.')
     parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate. Default: 1e-4.')
     # Network  #CONV_32_1_2_FC_1000_FC_100
-    parser.add_argument('--topology', type=str, default='CONVS_32_5_1_2_FCS_1000_FCS_10', help='Choice of network topology. Format for convolutional layers: CONV_{output channels}_{kernel size}_{stride}_{padding}. Format for fully-connected layers: FC_{output units}.')
+    parser.add_argument('--topology', type=str, default='CONV2S_64_3_1_1_CONV2S_128_3_1_1_CONV3S_256_3_1_1_CONV3S_512_3_1_1_CONV3S_512_3_1_1_FCVS_4096_FCVS_4096_FCVS_10', help='Choice of network topology. Format for convolutional layers: CONV_{output channels}_{kernel size}_{stride}_{padding}. Format for fully-connected layers: FC_{output units}.')
     parser.add_argument('--conv-act', type=str, choices = {'tanh', 'sigmoid', 'relu'}, default='tanh', help='Type of activation for the convolutional layers - Tanh (tanh), Sigmoid (sigmoid), ReLU (relu). Default: tanh.')
     parser.add_argument('--hidden-act', type=str, choices = {'tanh', 'sigmoid', 'relu'}, default='tanh', help='Type of activation for the fully-connected hidden layers - Tanh (tanh), Sigmoid (sigmoid), ReLU (relu). Default: tanh.')
     parser.add_argument('--output-act', type=str, choices = {'sigmoid', 'tanh', 'none'}, default='sigmoid', help='Type of activation for the network output layer - Sigmoid (sigmoid), Tanh (tanh), none (none). Default: sigmoid.')
     # parser.add_argument('--codename', type=str, default='test')
-    parser.add_argument('--cont', type=bool,default=False,help='"Choice the False if retrain from beginning')
     
     parser.add_argument('--tolerance', type=float, default=1e-4, help='Early stopping. Default: 1e-3.')
     parser.add_argument('--patience', type=float, default=50, help='Early stopping. Default:10.')
     parser.add_argument('--param-grid', type=float,  nargs='+', help='grid search lr')
     parser.add_argument('--device', type=int,   help='device')
-    parser.add_argument('--spike-window', type=int, default=100,   help='window T')
+    parser.add_argument('--spike-window', type=int, default=20,   help='window T')
+    parser.add_argument('--surrogate', type=str, default='atan',   help='window T')
+    parser.add_argument('--tau', type=float, default=2.0,   help='window T')
 
+    
+    parser.add_argument('--cont', type=int,default=0,help='Epoch to continue trraining. Default:0, start from the beginning.')
+    parser.add_argument('--start-trial', type=int,default=1,help='Starting trial')
+    parser.add_argument('--ckpt-interval', type=int,default=20)
     args = parser.parse_args()
     if args.freeze_conv_layers:
         args.codename = args.dataset+'-'+args.topology+'-'+args.train_mode+'-'+str(args.dropout)+'-random'
@@ -185,7 +228,7 @@ def main():
     #     device=args.device
     # param_grid = [5e-5, 1.5e-5,5e-6]    
     param_grid = [1.5e-3, 5e-4, 1.5e-4, 5e-5, 1.5e-5,5e-6]
-    # param_grid = [5e-4, 1.5e-4, 5e-5, 1.5e-5,5e-6]
+    #param_grid = [5e-4,1.5e-4, 5e-5, 1.5e-5,5e-6]
 
     # param_grid=[1.5e-5,5e-6]
     # param_grid = [1.5e-6, 3e-7, 3e-8, 5e-7]# 

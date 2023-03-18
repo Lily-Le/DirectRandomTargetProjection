@@ -46,9 +46,44 @@ from spikingjelly.clock_driven import neuron, encoding, functional
 import os
 import sys
 import time
-
+import datetime
 VGG16_topo='CONV2_64_3_1_1_CONV2_128_3_1_1_CONV3_256_3_1_1_CONV3_512_3_1_1_CONV3_512_3_1_1_FCV_4096_FCV_4096_FCV_10'
 # writer = SummaryWriter('logs')
+
+def filedel(filepath):
+    for i in ['/testloss.txt','/testacc.txt','/trainloss.txt','/trainacc.txt','/testtime.txt','traintime.txt']:
+        try:
+            os.remove(filepath+i)
+        except:
+            pass
+
+basename = "mylogfile"
+
+
+def dir_rename(dir):
+    suffix = datetime.datetime.now().strftime("%y%m%d_%H%M%S")
+    # filename = "_".join([basename, suffix]) # e.g. 'mylogfile_120508_171442'
+    dst_dir=f'{dir}_last'
+    if os.path.exists(dst_dir):
+        os.rename(dst_dir,f'{dst_dir}_{suffix}')
+    os.rename(dir,dst_dir)
+    print(f'Last training result dir renamed to "{dir}_last"')
+    
+def mkd(args):
+    try:
+        os.mkdir('output')
+    except:
+        pass
+    try:
+        os.mkdir('output/' + args.codename.split('/')[0])
+    except:
+        pass
+    try:
+        # os.mkdir('output/' + args.codename.split('/')[0]+'/'+args.codename)
+        os.makedirs('output/'+args.codename)
+    except:
+        pass
+
 def train(args, device, train_loader, traintest_loader, test_loader):
     # writer = SummaryWriter('logs/'+args.dataset+'/'+args.train_mode)
     log_path='logs/'+args.codename
@@ -68,8 +103,7 @@ def train(args, device, train_loader, traintest_loader, test_loader):
         
     for trial in range(args.start_trial,args.trials+args.start_trial):
         # Network topology
-        model = models.NetworkBuilder(args.topology, input_size=args.input_size, input_channels=args.input_channels, label_features=args.label_features, train_batch_size=args.batch_size, train_mode=args.train_mode, dropout=args.dropout, conv_act=args.conv_act, hidden_act=args.hidden_act, output_act=args.output_act, fc_zero_init=args.fc_zero_init, loss=args.loss, device=device)
-        # print(list(model.named_parameters()))
+        model=models.NetworkBuilder(args.topology, input_size=args.input_size, input_channels=args.input_channels, label_features=args.label_features, train_batch_size=args.batch_size, train_mode=args.train_mode, dropout=args.dropout, conv_act=args.conv_act, hidden_act=args.hidden_act, output_act=args.output_act, fc_zero_init=args.fc_zero_init, loss=args.loss, device=device,tau=args.tau,spike_window=args.spike_window,surrogate_=args.surrogate)        # print(list(model.named_parameters()))
         # tmp_=sys.stdout
         
         # ff = open(filepath+f'/model_summary_{args.batch_size}.log','w')
@@ -120,15 +154,33 @@ def train(args, device, train_loader, traintest_loader, test_loader):
 
         save_path=os.path.join(filepath,f'checkpoints/{trial}') #checkpoints
         save_log_path=os.path.join(filepath,f'logs/{trial}')
+        
+        if (args.cont == 0) and (os.path.exists(save_log_path)):
+            dir_rename(save_log_path)
+        if (args.cont == 0) and (os.path.exists(save_path)):
+            dir_rename(save_path)
         if not os.path.exists(save_path):
             os.makedirs(save_path)   
         if not os.path.exists(save_log_path):
             os.makedirs(save_log_path)  
             
-        if os.path.exists(save_path+'/latest.pth') and args.cont==True:
-            checkpoint = torch.load(save_path+'/latest.pth')
+        file = open(save_log_path+'/para.txt','w')
+        file.write('pid:'+str(os.getpid())+'\n')
+        file.write(str(vars(args)).replace(',','\n'))
+        file.close()
+        if (args.cont!=0) and os.path.exists(save_path+f'/{args.cont}.pth') :
+
+            checkpoint = torch.load(save_path+f'/{args.cont}.pth')
             model.load_state_dict(checkpoint['model'])
-            optimizer=(checkpoint['optimizer'])
+            try:
+                optimizer.load_state_dict(checkpoint['optimizer'])
+                print('load optimizer state dict')
+            except:
+                optimizer=checkpoint['optimizer']
+                optimizer.add_param_group({'params':model.parameters()})
+                print('load optimizer')
+            # optimizer.load_state_dict(checkpoint["optimizer"].state_dict())
+            # del optimizer_tmp
             start_epoch = checkpoint['epoch']
             print('加载 epoch {} 成功！'.format(start_epoch))
         else:
@@ -159,11 +211,11 @@ def train(args, device, train_loader, traintest_loader, test_loader):
             filetesttime.write(str(epoch) + ' ' + str(time_elapsed) + '\n')
             print('Testinging complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
             # Save model
-            if ~(epoch % 20) and (epoch!=0):
-                torch.save({'model':model.state_dict(),'optimizer':optimizer.state_dict(),'epoch':epoch},os.path.join(save_path,f'latest.pth'))
+            if (epoch % args.ckpt_interval)==0 and (epoch!=0):
+                torch.save({'model':model.state_dict(),'optimizer':optimizer.state_dict(),'epoch':epoch},os.path.join(save_path,f'{epoch}.pth'))
                 # torch.save(model.state_dict(), os.path.join(save_path,f'latest.pth'))
                 print(f'Model saved! Epoch= {epoch}')
-        torch.save({'model':model.state_dict(),'optimizer':optimizer,'epoch':epoch}, os.path.join(save_path,f'latest.pth'))
+        torch.save({'model':model.state_dict(),'optimizer':optimizer.state_dict(),'epoch':epoch}, os.path.join(save_path,f'{epoch}.pth'))
         print(f'Model saved! Epoch= {epoch}')
         
 def train_epoch(args, model, device, train_loader, optimizer, loss):
