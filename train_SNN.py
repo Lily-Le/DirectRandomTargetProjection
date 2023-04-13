@@ -47,7 +47,7 @@ import os
 import sys
 import time
 import datetime
-VGG16_topo='CONV2_64_3_1_1_CONV2_128_3_1_1_CONV3_256_3_1_1_CONV3_512_3_1_1_CONV3_512_3_1_1_FCV_4096_FCV_4096_FCV_10'
+VGG16S_topo='CONV2S_64_3_1_1_CONV2S_128_3_1_1_CONV3S_256_3_1_1_CONV3S_512_3_1_1_CONV3S_512_3_1_1_FCVS_4096_FCVS_4096_FCVS_10'
 # writer = SummaryWriter('logs')
 
 def filedel(filepath):
@@ -56,8 +56,6 @@ def filedel(filepath):
             os.remove(filepath+i)
         except:
             pass
-
-basename = "mylogfile"
 
 
 def dir_rename(dir):
@@ -104,19 +102,20 @@ def train(args, device, train_loader, traintest_loader, test_loader):
     for trial in range(args.start_trial,args.trials+args.start_trial):
         # Network topology
         model=models.NetworkBuilder(args.topology, input_size=args.input_size, input_channels=args.input_channels, label_features=args.label_features, train_batch_size=args.batch_size, train_mode=args.train_mode, dropout=args.dropout, conv_act=args.conv_act, hidden_act=args.hidden_act, output_act=args.output_act, fc_zero_init=args.fc_zero_init, loss=args.loss, device=device,tau=args.tau,spike_window=args.spike_window,surrogate_=args.surrogate)        # print(list(model.named_parameters()))
-        # tmp_=sys.stdout
+
+        tmp_=sys.stdout
         
-        # ff = open(filepath+f'/model_summary_{args.batch_size}.log','w')
-        # sys.stdout = ff
-        # model_info=torchinfo.summary(model,[(args.batch_size,args.input_channels,args.input_size,args.input_size),[args.label_features]])
-        # print(args.topology)
-        # print(args.dataset)
-        # print(f'batch size {args.batch_size}')
-        # print(model_info)
-        # ff.close()
+        ff = open(filepath+f'/model_summary_{args.batch_size}.log','w')
+        sys.stdout = ff
+        model_info=torchinfo.summary(model,[(args.batch_size,args.input_channels,args.input_size,args.input_size),[args.label_features]])
+        print(args.topology)
+        print(args.dataset)
+        print(f'batch size {args.batch_size}')
+        print(model_info)
+        ff.close()
         
-        # sys.stdout = tmp_
-        # print(model_info)
+        sys.stdout = tmp_
+        print(model_info)
         
 
                  
