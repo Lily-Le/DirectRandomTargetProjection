@@ -81,8 +81,8 @@ def main():
     parser.add_argument('--freeze-conv-layers', action='store_true', default=False, help='Disable training of convolutional layers and keeps the weights at their initialized values.')
     parser.add_argument('--fc-zero-init', action='store_true', default=False, help='Initializes fully-connected weights to zero instead of the default He uniform initialization.')
     parser.add_argument('--dropout', type=float, default=0, help='Dropout probability (applied only to fully-connected layers). Default: 0.')
-    parser.add_argument('--trials', type=int, default=7, help='Number of training trials Default: 1.')
-    parser.add_argument('--epochs', type=int, default=250, help='Number of training epochs Default: 100.')
+    parser.add_argument('--trials', type=int, default=1, help='Number of training trials Default: 1.')
+    parser.add_argument('--epochs', type=int, default=800, help='Number of training epochs Default: 100.')
     parser.add_argument('--batch-size', type=int, default=128, help='Input batch size for training. Default: 100.')
     parser.add_argument('--test-batch-size', type=int, default=128, help='Input batch size for testing Default: 1000.')
     parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate. Default: 1e-4.')
@@ -94,15 +94,16 @@ def main():
     parser.add_argument('--hidden-act', type=str, choices = {'tanh', 'sigmoid', 'relu'}, default='tanh', help='Type of activation for the fully-connected hidden layers - Tanh (tanh), Sigmoid (sigmoid), ReLU (relu). Default: tanh.')
     parser.add_argument('--output-act', type=str, choices = {'sigmoid', 'tanh', 'none'}, default='sigmoid', help='Type of activation for the network output layer - Sigmoid (sigmoid), Tanh (tanh), none (none). Default: sigmoid.')
     # parser.add_argument('--codename', type=str, default='test')
-    parser.add_argument('--cont', type=bool,default=False,help='"Choice the False if retrain from beginning')
+    parser.add_argument('--cont', type=int,default=0,help='Epoch to continue trraining. Default:0, start from the beginning.')
     parser.add_argument('--start-trial', type=int,default=1,help='Starting trial')
+    parser.add_argument('--ckpt-interval', type=int,default=50)
 
     args = parser.parse_args()
     VGG16_topo='CONV2_64_3_1_1_CONV2_128_3_1_1_CONV3_256_3_1_1_CONV3_512_3_1_1_CONV3_512_3_1_1_FCV_4096_FCV_4096_FCV_10'
 
     if args.topology == VGG16_topo:
         tpg_name='VGG16'
-    else:
+    else:      
         tpg_name=args.topology
         
     if args.freeze_conv_layers:
@@ -113,13 +114,13 @@ def main():
 
 
     mkd(args)
-    filepath = 'output/'+args.codename
-    file = open(filepath+'/para.txt','w')
-    file.write('pid:'+str(os.getpid())+'\n')
-    file.write(str(vars(args)).replace(',','\n'))
-    file.close()
-    if args.cont ==False:
-        filedel(filepath)
+    # filepath = 'output/'+args.codename
+    # file = open(filepath+'/para.txt','w')
+    # file.write('pid:'+str(os.getpid())+'\n')
+    # file.write(str(vars(args)).replace(',','\n'))
+    # file.close()
+    # if args.cont ==0:
+    #     filedel(filepath)
 
     (device, train_loader, traintest_loader, test_loader) = setup.setup(args)
     train.train(args, device, train_loader, traintest_loader, test_loader)

@@ -7,7 +7,7 @@ from tensorboardX import SummaryWriter
 
 import json
 import argparse
-import train_0224 as train
+import train_SNN as train
 import setup
 import os
 import models_SNN as models
@@ -112,8 +112,12 @@ def GridSearch(args, device, train_loader, traintest_loader,  test_loader, param
                     patience -= 1
                     if patience == 0:
                         break
+            if (epoch % args.ckpt_interval)==0 and (epoch!=0):
+                torch.save({'model':model.state_dict(),'optimizer':optimizer.state_dict(),'epoch':epoch},os.path.join(checkpoint_path,f'{epoch}.pth'))
+                # torch.save(model.state_dict(), os.path.join(save_path,f'latest.pth'))
+                print(f'Model saved! Epoch= {epoch}')                    
         
-        torch.save({'model':model.state_dict(),'optimizer':optimizer,'epoch':epoch}, os.path.join(checkpoint_path,f'{epoch}.pth'))
+        torch.save({'model':model.state_dict(),'optimizer':optimizer.state_dict(),'epoch':epoch}, os.path.join(checkpoint_path,f'{epoch}.pth'))
         print(f'Model saved! Epoch= {epoch}')
         final_score = np.mean(scores[-10:])
         
@@ -164,12 +168,13 @@ def main():
     parser.add_argument('--hidden-act', type=str, choices = {'tanh', 'sigmoid', 'relu'}, default='tanh', help='Type of activation for the fully-connected hidden layers - Tanh (tanh), Sigmoid (sigmoid), ReLU (relu). Default: tanh.')
     parser.add_argument('--output-act', type=str, choices = {'sigmoid', 'tanh', 'none'}, default='sigmoid', help='Type of activation for the network output layer - Sigmoid (sigmoid), Tanh (tanh), none (none). Default: sigmoid.')
     # parser.add_argument('--codename', type=str, default='test')
-    parser.add_argument('--cont', type=bool,default=False,help='"Choice the False if retrain from beginning')
     
     parser.add_argument('--tolerance', type=float, default=1e-4, help='Early stopping. Default: 1e-3.')
     parser.add_argument('--patience', type=float, default=50, help='Early stopping. Default:10.')
     parser.add_argument('--param-grid', type=float,  nargs='+', help='grid search lr')
-
+    parser.add_argument('--cont', type=int,default=0,help='Epoch to continue trraining. Default:0, start from the beginning.')
+    parser.add_argument('--start-trial', type=int,default=1,help='Starting trial')
+    parser.add_argument('--ckpt-interval', type=int,default=20)
     args = parser.parse_args()
     if args.freeze_conv_layers:
         args.codename = args.dataset+'-'+args.topology+'-'+args.train_mode+'-'+str(args.dropout)+'-random'

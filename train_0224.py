@@ -44,9 +44,45 @@ from tensorboardX import SummaryWriter
 import os
 import sys
 import time
-
+import pdb
+import datetime
 VGG16_topo='CONV2_64_3_1_1_CONV2_128_3_1_1_CONV3_256_3_1_1_CONV3_512_3_1_1_CONV3_512_3_1_1_FCV_4096_FCV_4096_FCV_10'
 # writer = SummaryWriter('logs')
+
+def filedel(filepath):
+    for i in ['/testloss.txt','/testacc.txt','/trainloss.txt','/trainacc.txt','/testtime.txt','traintime.txt']:
+        try:
+            os.remove(filepath+i)
+        except:
+            pass
+
+basename = "mylogfile"
+
+
+def dir_rename(dir):
+    suffix = datetime.datetime.now().strftime("%y%m%d_%H%M%S")
+    # filename = "_".join([basename, suffix]) # e.g. 'mylogfile_120508_171442'
+    dst_dir=f'{dir}_last'
+    if os.path.exists(dst_dir):
+        os.rename(dst_dir,f'{dst_dir}_{suffix}')
+    os.rename(dir,dst_dir)
+    print(f'Last training result dir renamed to "{dir}_last"')
+    
+def mkd(args):
+    try:
+        os.mkdir('output')
+    except:
+        pass
+    try:
+        os.mkdir('output/' + args.codename.split('/')[0])
+    except:
+        pass
+    try:
+        # os.mkdir('output/' + args.codename.split('/')[0]+'/'+args.codename)
+        os.makedirs('output/'+args.codename)
+    except:
+        pass
+
 def train(args, device, train_loader, traintest_loader, test_loader):
     # writer = SummaryWriter('logs/'+args.dataset+'/'+args.train_mode)
     log_path='logs/'+args.codename
@@ -100,6 +136,7 @@ def train(args, device, train_loader, traintest_loader, test_loader):
             optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=0.9, nesterov=True)
         elif args.optimizer == 'Adam':
             optimizer = optim.Adam(model.parameters(), lr=args.lr)
+            # pdb.set_trace()
         elif args.optimizer == 'RMSprop':
             optimizer = optim.RMSprop(model.parameters(), lr=args.lr)
         else:
@@ -118,15 +155,49 @@ def train(args, device, train_loader, traintest_loader, test_loader):
 
         save_path=os.path.join(filepath,f'checkpoints/{trial}') #checkpoints
         save_log_path=os.path.join(filepath,f'logs/{trial}')
+
+        if (args.cont == 0) and (os.path.exists(save_log_path)):
+            dir_rename(save_log_path)
+        if (args.cont == 0) and (os.path.exists(save_path)):
+            dir_rename(save_path)
         if not os.path.exists(save_path):
             os.makedirs(save_path)   
         if not os.path.exists(save_log_path):
             os.makedirs(save_log_path)  
-            
-        if os.path.exists(save_path+'/latest.pth') and args.cont==True:
-            checkpoint = torch.load(save_path+'/latest.pth')
+        
+        file = open(save_log_path+'/para.txt','w')
+        file.write('pid:'+str(os.getpid())+'\n')
+        file.write(str(vars(args)).replace(',','\n'))
+        file.close()
+        if (args.cont!=0) and os.path.exists(save_path+f'/{args.cont}.pth') :
+
+            checkpoint = torch.load(save_path+f'/{args.cont}.pth')
             model.load_state_dict(checkpoint['model'])
-            optimizer=(checkpoint['optimizer'])
+            try:
+                # pdb.set_trace()
+                optimizer.load_state_dict(checkpoint['optimizer'])
+                print('load optimizer state dict')
+            except:
+                # pdb.set_trace()
+                try:
+                    keys_=[*checkpoint['optimizer']['state']]
+                    for i in range(int(len(keys_)/2)):
+                        n1=keys_[i]
+                        n2=keys_[i+32]
+                        # pdb.set_trace()
+                        optimizer.state_dict()['state'][n1]=checkpoint['optimizer']['state'][n2]
+                except:
+                    keys_=[*checkpoint['optimizer'].state_dict()['state']]
+                    for n in keys_:
+                        optimizer.state_dict()['state'][n]=checkpoint['optimizer'].state_dict()['state'][n]
+                    # pdb.set_trace()
+                # for n in optimizer.state_dict()['param_groups'][0]['params']:
+                #     optimizer.state_dict()['state'][n]=checkpoint['optimizer']['state'][n+32]
+                # optimizer.add_param_group({'params':model.parameters()})
+                # optimizer.load_state_dict(checkpoint['optimizer'])
+                # print('load optimizer')
+            # optimizer.load_state_dict(checkpoint["optimizer"].state_dict())
+            # del optimizer_tmp
             start_epoch = checkpoint['epoch']
             print('加载 epoch {} 成功！'.format(start_epoch))
         else:
@@ -157,11 +228,11 @@ def train(args, device, train_loader, traintest_loader, test_loader):
             filetesttime.write(str(epoch) + ' ' + str(time_elapsed) + '\n')
             print('Testinging complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
             # Save model
-            if ~(epoch % 20) and (epoch!=0):
-                torch.save({'model':model.state_dict(),'optimizer':optimizer.state_dict(),'epoch':epoch},os.path.join(save_path,f'latest.pth'))
+            if (epoch % args.ckpt_interval)==0 and (epoch!=0):
+                torch.save({'model':model.state_dict(),'optimizer':optimizer.state_dict(),'epoch':epoch},os.path.join(save_path,f'{epoch}.pth'))
                 # torch.save(model.state_dict(), os.path.join(save_path,f'latest.pth'))
                 print(f'Model saved! Epoch= {epoch}')
-        torch.save({'model':model.state_dict(),'optimizer':optimizer,'epoch':epoch}, os.path.join(save_path,f'latest.pth'))
+        torch.save({'model':model.state_dict(),'optimizer':optimizer.state_dict(),'epoch':epoch}, os.path.join(save_path,f'{epoch}.pth'))
         print(f'Model saved! Epoch= {epoch}')
         
 def train_epoch(args, model, device, train_loader, optimizer, loss):
@@ -178,11 +249,14 @@ def train_epoch(args, model, device, train_loader, optimizer, loss):
             targets = label
         else:
             targets = torch.zeros(label.shape[0], args.label_features, device=device).scatter_(1, label.unsqueeze(1), 1.0) #one-hot?
+        # pdb.set_trace()
         optimizer.zero_grad()
         output = model(data, targets)
         loss_val = loss[0](output, loss[1](targets)) ###################
         loss_val.backward()
         optimizer.step()
+        # pdb.set_trace()
+        
 
 def writefile(filepath, filename):
     if not os.path.exists(filepath):
